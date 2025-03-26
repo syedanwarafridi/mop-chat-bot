@@ -16,10 +16,6 @@ model = AutoModelForCausalLM.from_pretrained(
 tokenizer = AutoTokenizer.from_pretrained(classifier_model)
 
 
-
-
-
-
 model, tokenizer = load_fine_tuned_model(model_id)
 
 parser = argparse.ArgumentParser(description="Generate responses using a fine-tuned language model.")

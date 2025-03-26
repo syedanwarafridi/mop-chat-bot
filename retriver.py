@@ -1,8 +1,5 @@
 import requests
-# from langchain_community.tools.tavily_search import TavilySearchResults
 import os
-# from dotenv import load_dotenv
-# load_dotenv()
 
 # -----------------------> Similarity/Distance BASE API <----------------------- #
 def distance_api(query: str):
@@ -36,7 +33,10 @@ def token_api(query: str):
     except requests.exceptions.RequestException as e:
         return {"error": "Request exception occurred", "details": str(e)}
     
+
 # -----------------------> Tavily API <----------------------- #
+# from langchain_community.tools.tavily_search import TavilySearchResults
+
 # os.environ['TAVILY_API_KEY'] = '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'
 # def tavily_data(query: str):
 #     tool = TavilySearchResults(max_results=5)

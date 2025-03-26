@@ -25,6 +25,9 @@ def classifier_model(user_input):
                 **Important:** 
                 - Token names may appear in different formats such as "$TOKEN", "TOKEN_NAME", or "TOKEN TICKER". Extract all mentioned tokens.
                 - Contract addresses (CA) can have different formats (e.g., Ethereum-style `0x...` or Solana-style alphanumeric). Extract and return them if mentioned.
+                - Some of Tokens have `pump`, `So` and `moon` words at end also classify the category as `token` and include it in the response.
+                - If the character does not give meanings. Consider it as token.
+                - If the token is mentioned with `$` sign in query classify it as `general`.
 
                 Please provide your response in **strict JSON format**:
                 {{

@@ -1,0 +1,13 @@
+{"time":"2025-03-26T22:11:11.6197487+05:00","level":"INFO","msg":"stream: starting","core version":"0.19.8","symlink path":"c:\\Users\\Asus\\Desktop\\AlphaSquad\\mop-chat-bot\\Notebooks\\wandb\\run-20250326_221111-yvtz8ncf\\logs\\debug-core.log"}
+{"time":"2025-03-26T22:11:11.7251717+05:00","level":"INFO","msg":"created new stream","id":"yvtz8ncf"}
+{"time":"2025-03-26T22:11:11.7251717+05:00","level":"INFO","msg":"stream: started","id":"yvtz8ncf"}
+{"time":"2025-03-26T22:11:11.7251717+05:00","level":"INFO","msg":"writer: Do: started","stream_id":"yvtz8ncf"}
+{"time":"2025-03-26T22:11:11.7251717+05:00","level":"INFO","msg":"sender: started","stream_id":"yvtz8ncf"}
+{"time":"2025-03-26T22:11:11.7251717+05:00","level":"INFO","msg":"handler: started","stream_id":"yvtz8ncf"}
+{"time":"2025-03-26T22:11:12.1742088+05:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2025-03-26T22:11:12.2853956+05:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-03-26T22:11:12.2972953+05:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-03-26T22:11:12.2979757+05:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-03-26T22:11:12.3119091+05:00","level":"INFO","msg":"Resuming system monitor"}
+{"time":"2025-03-26T22:11:12.3125211+05:00","level":"INFO","msg":"Pausing system monitor"}
+{"time":"2025-03-26T22:11:12.327862+05:00","level":"INFO","msg":"Resuming system monitor"}
