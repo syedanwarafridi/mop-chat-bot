@@ -27,7 +27,9 @@ def classifier_model(user_input):
                 - Contract addresses (CA) can have different formats (e.g., Ethereum-style `0x...` or Solana-style alphanumeric). Extract and return them if mentioned.
                 - Some of Tokens have `pump`, `So` and `moon` words at end also classify the category as `token` and include it in the response.
                 - If the character does not give meanings. Consider it as token.
-                - If the token is mentioned with `$` sign in query classify it as `general`.
+                - If the token/coin is mentioned with `$` sign in query classify it as `general`.
+                - If the token/coin is mentioned simply with the name (e.g. TERM, BTC, SOL) in query classify it as `general`
+                - Consider the words with `@` as twitter username and do not consider it as token. 
 
                 Please provide your response in **strict JSON format**:
                 {{
