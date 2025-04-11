@@ -8,11 +8,11 @@ def distance_api(query: str):
     
     try:
         response = requests.get(BASE_URL, params=PARAMS)
-        
+
         if response.status_code == 200:
             response = response.json()
             top_items = sorted(response["data"], key=lambda x: x['distance'])[:3] 
-            return [item['chunk'] for item in top_items]
+            return [item for item in top_items]
         else:
             return {"error": f"Error {response.status_code}: {response.text}"}
     except requests.exceptions.RequestException as e:
