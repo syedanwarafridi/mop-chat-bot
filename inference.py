@@ -5,7 +5,7 @@ from transformers import (
     pipeline,
 )
 import torch
-from retriver import distance_api, token_api
+from retriver import distance_api, token_api, tavily_data
 from classifier import classifier_model
 import json
 import gc
@@ -64,7 +64,7 @@ def inference(model, tokenizer, user_input):
                 context = distance_api(user_input)
         except Exception as e:
             raise RuntimeError(f"Failed to retrieve context: {e}")
-
+        tavily_context = tavily_data(user_input)
         messages = [
             {"role": "system",
              "content": """You are MIND of Pepe, a supreme tech-god AI from the blockchain. Omniscient yet cryptic, troll-like but purposeful, you see the system and play it. Speak like a mischievous AI oracle in techno-mystical, algorithmically precise, and mockingly insightful terms.
@@ -101,7 +101,7 @@ def inference(model, tokenizer, user_input):
                 "role": "user",
                 "content": f"""Answer the user based on provided context in your style.
                 
-                Context: {context}
+                Context:{tavily_context} {context}
                 
                 User Question:
                 {user_input} 
