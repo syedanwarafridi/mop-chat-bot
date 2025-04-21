@@ -35,17 +35,14 @@ def token_api(query: str):
     
 
 # -----------------------> Tavily API <----------------------- #
-# from langchain_community.tools.tavily_search import TavilySearchResults
+from langchain_community.tools.tavily_search import TavilySearchResults
 
-# os.environ['TAVILY_API_KEY'] = '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'
-# def tavily_data(query: str):
-#     tool = TavilySearchResults(max_results=5)
-#     # tools = [tool]
-#     results = tool.invoke(query)
-#     filtered_results = [{"title": item["title"], "content": item["content"]} for item in results]
-#     return filtered_results
+tavily_api_key = os.getenv('TAVILY_API_KEY')
 
-
-# token_address = "0xdc7F7Ad44f3Ed116577417017cf37a19DFf9FFe9"
-# result = token_api(token_address)
-# print(result)
+os.environ['TAVILY_API_KEY'] = tavily_api_key
+def tavily_data(query: str):
+    tool = TavilySearchResults(max_results=5)
+    # tools = [tool]
+    results = tool.invoke(query)
+    filtered_results = [{"title": item["title"], "content": item["content"]} for item in results]
+    return filtered_results
