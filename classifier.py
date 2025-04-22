@@ -18,6 +18,7 @@ try:
 except Exception as e:
     raise RuntimeError(f"Failed to load classifier model or tokenizer: {e}")
 
+# ----------------------> QUERY CLASSIFIER <---------------------- #
 def classifier_model(user_input):
     try:
         if not user_input or not user_input.strip():
@@ -72,3 +73,42 @@ def classifier_model(user_input):
         raise ValueError(f"Model response is not valid JSON: {e}\nRaw response: {response}")
     except Exception as e:
         raise RuntimeError(f"Classification failed: {e}")
+
+# ----------------------> Relevant Information Extractor <---------------------- #
+def info_extracor(user_input, data):
+    try:
+        if not user_input or not user_input.strip():
+            raise ValueError("Query is empty or contains only whitespace.")
+
+        messages = [
+            {"role": "system", 
+             "content": f"""
+                You are an AI Information Extractor assistant. Your Task is to extract relevant information from the provided data.
+                
+                Data: {data}
+                User Query: {user_input}
+
+                Your task is to extract the relevant information from the data based on the user query. Only relevant information/paragraphs should be included in the response.
+                Return the same words as in the data. Do not add any extra information or explanation.
+            """},
+            {"role": "user", "content": user_input}
+        ]
+
+        text = tokenizer.apply_chat_template(
+            messages,
+            tokenize=False,
+            add_generation_prompt=True
+        )
+
+        model_inputs = tokenizer([text], return_tensors="pt").to(model.device)
+
+        generated_ids = model.generate(**model_inputs, max_length=4096)
+
+        generated_ids = [output_ids[len(input_ids):] for input_ids, output_ids in zip(model_inputs.input_ids, generated_ids)]
+
+        response = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+        return response
+    
+    except Exception as e:
+        raise RuntimeError(f"Extraction Information is failed: {e}")
