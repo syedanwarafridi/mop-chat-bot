@@ -33,6 +33,7 @@ def classifier_model(user_input):
                     If a token name, ticker symbol (e.g., "$BTC"), or contract address (CA) is mentioned, extract them and return them in the response.
 
                     **Important:** 
+                    - Classify all that queries as `token` if if the user query contains any `Contract Address`, and `Binary address` otherwise classify it as `general`.
                     - Token names may appear in different formats such as "$TOKEN", "TOKEN_NAME", or "TOKEN TICKER". Extract all mentioned tokens.
                     - Contract addresses (CA) can have different formats (e.g., Ethereum-style `0x...` or Solana-style alphanumeric). Extract and return them if mentioned.
                     - Some of Tokens have `pump`, `So` and `moon` words at end also classify the category as `token` and include it in the response.
