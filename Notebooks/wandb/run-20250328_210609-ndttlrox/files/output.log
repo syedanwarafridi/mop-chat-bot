@@ -1,0 +1,32 @@
+Loading checkpoint shards: 100%|██████████| 4/4 [00:11<00:00,  2.97s/it]
+The new embeddings will be initialized from a multivariate normal distribution that has old embeddings' mean and covariance. As described in this article: https://nlp.stanford.edu/~johnhew/vocab-expansion.html. To disable this, use `mean_resizing=False`
+The new lm_head weights will be initialized from a multivariate normal distribution that has old embeddings' mean and covariance. As described in this article: https://nlp.stanford.edu/~johnhew/vocab-expansion.html. To disable this, use `mean_resizing=False`
+DatasetDict({
+    train: Dataset({
+        features: ['question', 'answer', 'context', 'text', 'token_count'],
+        num_rows: 5138
+    })
+    validation: Dataset({
+        features: ['question', 'answer', 'context', 'text', 'token_count'],
+        num_rows: 1028
+    })
+    test: Dataset({
+        features: ['question', 'answer', 'context', 'text', 'token_count'],
+        num_rows: 257
+    })
+})
+DatasetDict({
+    train: Dataset({
+        features: ['question', 'answer', 'context', 'text', 'token_count'],
+        num_rows: 5138
+    })
+    validation: Dataset({
+        features: ['question', 'answer', 'context', 'text', 'token_count'],
+        num_rows: 1028
+    })
+    test: Dataset({
+        features: ['question', 'answer', 'context', 'text', 'token_count'],
+        num_rows: 257
+    })
+})
+Map (num_proc=4):  12%|█▏        | 610/5138 [01:31<10:32,  7.16 examples/s]

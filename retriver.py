@@ -82,3 +82,4 @@ def tavily_data(query: str):
     results = tool.invoke(query)
     filtered_results = [{"title": item["title"], "content": item["content"]} for item in results]
     return filtered_results
+

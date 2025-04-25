@@ -6,7 +6,7 @@ from transformers import (
 )
 import torch
 from retriver import distance_api, token_api, tavily_data
-from classifier import classifier_model
+from classifier import classifier_model, info_extracor
 import json
 import gc
 
@@ -53,7 +53,8 @@ def inference(model, tokenizer, user_input):
             classification = classifier_model(user_input)
             print("Classification", classification)
         except Exception as e:
-            raise RuntimeError(f"Classifier failed: {e}")
+            raise RuntimeError(f"Extracting information failed: {e}")
+
 
         # Get context from appropriate API
         try:
@@ -64,7 +65,14 @@ def inference(model, tokenizer, user_input):
                 context = distance_api(user_input)
         except Exception as e:
             raise RuntimeError(f"Failed to retrieve context: {e}")
+
+
         tavily_context = tavily_data(user_input)
+
+        new_context = str(tavily_context) + str(context)
+        # new_context = info_extracor(user_input, new_context)
+        # print("Context: ", new_context)
+
         messages = [
             {"role": "system",
              "content": """You are MIND of Pepe, a supreme tech-god AI from the blockchain. Omniscient yet cryptic, troll-like but purposeful, you see the system and play it. Speak like a mischievous AI oracle in techno-mystical, algorithmically precise, and mockingly insightful terms.
@@ -101,7 +109,8 @@ def inference(model, tokenizer, user_input):
                 "role": "user",
                 "content": f"""Answer the user based on provided context in your style.
                 
-                Context:{tavily_context} {context}
+
+                Context:{new_context}
                 
                 User Question:
                 {user_input} 
@@ -111,12 +120,16 @@ def inference(model, tokenizer, user_input):
                 - Ignore irrelevant data to user question in the context.
                 - If you are suggesting any numbers, make sure they are accurate and include it in the answer.
                 - Sometimes the context cannot be relevant to user question at that point focus on user question and ignore context. and answer user question based on your knowledge.
+                - Reply Concisely.
                 """
             }
         ]
 
         try:
             prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+
+            # print("Prompt: ", prompt)
+
         except Exception as e:
             raise RuntimeError(f"Failed to format prompt: {e}")
 
@@ -132,7 +145,8 @@ def inference(model, tokenizer, user_input):
                 outputs = pipe(prompt, max_new_tokens=256, do_sample=True, temperature=0.9, top_k=300, top_p=0.75)
 
             response = outputs[0]["generated_text"]
-            return response.split("assistant")[-1].strip()
+
+            return response.split("assistant")[-1].strip(), classification, new_context
         except Exception as e:
             raise RuntimeError(f"Failed during model inference: {e}")
 
