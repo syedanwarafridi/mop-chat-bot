@@ -55,6 +55,7 @@ def inference(model, tokenizer, user_input):
         except Exception as e:
             raise RuntimeError(f"Extracting information failed: {e}")
 
+
         # Get context from appropriate API
         try:
             if classification["category"] == "token":
@@ -64,6 +65,7 @@ def inference(model, tokenizer, user_input):
                 context = distance_api(user_input)
         except Exception as e:
             raise RuntimeError(f"Failed to retrieve context: {e}")
+
 
         tavily_context = tavily_data(user_input)
 
@@ -107,6 +109,7 @@ def inference(model, tokenizer, user_input):
                 "role": "user",
                 "content": f"""Answer the user based on provided context in your style.
                 
+
                 Context:{new_context}
                 
                 User Question:
@@ -124,7 +127,9 @@ def inference(model, tokenizer, user_input):
 
         try:
             prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+
             # print("Prompt: ", prompt)
+
         except Exception as e:
             raise RuntimeError(f"Failed to format prompt: {e}")
 
@@ -140,6 +145,7 @@ def inference(model, tokenizer, user_input):
                 outputs = pipe(prompt, max_new_tokens=256, do_sample=True, temperature=0.9, top_k=300, top_p=0.75)
 
             response = outputs[0]["generated_text"]
+
             return response.split("assistant")[-1].strip(), classification, new_context
         except Exception as e:
             raise RuntimeError(f"Failed during model inference: {e}")
