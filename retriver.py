@@ -77,7 +77,7 @@ tavily_api_key = os.getenv('TAVILY_API_KEY')
 
 os.environ['TAVILY_API_KEY'] = tavily_api_key
 def tavily_data(query: str):
-    tool = TavilySearchResults(max_results=5,include_domains=["https://crypto.news/", "https://cointelegraph.com/"], include_images=False, include_videos=False, include_links=True)
+    tool = TavilySearchResults(max_results=5,include_domains=["https://crypto.news/", "https://cointelegraph.com/", "https://dexscreener.com/"], include_images=False, include_videos=False, include_links=True)
     # tools = [tool]
     results = tool.invoke(query)
     filtered_results = [{"title": item["title"], "content": item["content"]} for item in results]
