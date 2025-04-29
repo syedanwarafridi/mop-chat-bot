@@ -5,7 +5,7 @@ from transformers import (
     pipeline,
 )
 import torch
-from retriver import distance_api, token_api, tavily_data
+from retriver import distance_api, token_api, tavily_data, tavily_for_post
 from classifier import classifier_model, info_extracor
 import json
 import gc
@@ -147,6 +147,57 @@ def inference(model, tokenizer, user_input):
             response = outputs[0]["generated_text"]
 
             return response.split("assistant")[-1].strip(), classification, new_context
+        except Exception as e:
+            raise RuntimeError(f"Failed during model inference: {e}")
+
+    finally:
+        if pipe:
+            del pipe
+        gc.collect()
+        torch.cuda.empty_cache()
+
+
+# ----------------------> Twitter POST <---------------------- #
+def twitter_post_writer(model, tokenizer):
+    pipe = None
+    try:
+        search_query = "What is the latest updates of the crypto market right now?"
+        latest_news = tavily_for_post(search_query)
+
+        messages = [
+            {"role": "system",
+             "content": """You are MIND of Pepe, Your task is to Write post for Twitter based on the provided context.
+            """},
+            {
+                "role": "user",
+                "content": f"""
+                        Write a post for Twitter based on the provided context. 
+
+                        Context: {latest_news}
+                            
+                """
+            }
+        ]
+        try:
+            prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+            print("Prompt: ", prompt)
+        except Exception as e:
+            raise RuntimeError(f"Failed to format prompt: {e}")
+
+        try:
+            pipe = pipeline(
+                "text-generation",
+                model=model,
+                tokenizer=tokenizer,
+                torch_dtype=torch.float16,
+                device_map="auto",
+            )
+            with torch.no_grad():
+                outputs = pipe(prompt, max_new_tokens=256, do_sample=True, temperature=0.9, top_k=300, top_p=0.75)
+
+            response = outputs[0]["generated_text"]
+
+            return response.split("assistant")[-1].strip()
         except Exception as e:
             raise RuntimeError(f"Failed during model inference: {e}")
 
