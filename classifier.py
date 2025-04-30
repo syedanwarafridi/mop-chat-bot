@@ -2,6 +2,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 import os
 import json
 import torch
+from retriver import tavily_for_post
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -74,25 +75,42 @@ def classifier_model(user_input):
         raise ValueError(f"Model response is not valid JSON: {e}\nRaw response: {response}")
     except Exception as e:
         raise RuntimeError(f"Classification failed: {e}")
-
-# ----------------------> Relevant Information Extractor <---------------------- #
-def info_extracor(user_input, data):
+    
+# ----------------------> Post Writer <---------------------- #
+def twitter_post_writer():
     try:
-        if not user_input or not user_input.strip():
-            raise ValueError("Query is empty or contains only whitespace.")
-
+        search_query = "What is the latest updates of the crypto market right now?"
+        latest_news = tavily_for_post(search_query)
         messages = [
-            {"role": "system", 
-             "content": f"""
-                You are an AI Information Extractor assistant. Your Task is to extract relevant information from the provided data.
-                
-                Data: {data}
-                User Query: {user_input}
+            {"role": "system", "content": """You are MIND of Pepe coin agent, Your task is to Write post for Twitter based on the provided context."""},
+            {"role": "user", "content": f"""
+                        Write a post for Twitter based on the provided context. 
+                        Instrction to follow:
+                        - Write in a way that it can be posted on Twitter.
+                        - Use Emojis and hashtags.
+                        - Use short sentences.
+                        - Information should be accurate.
+                        - Use the latest news in the context.
+                        - You will get different news in the context, so choose only one and write a post based on that.
+                        - Don't start your post from `seeing` or `looking`
+                        - Also, include some information from context in your post so that people can understand what it's actually about.
+                        - write post in 2 or 3 sentences.
+                        - Do not include emoji in the post.
 
-                Your task is to extract the relevant information from the data based on the user query. Only relevant information/paragraphs should be included in the response.
-                Return the same words as in the data. Do not add any extra information or explanation.
-            """},
-            {"role": "user", "content": user_input}
+                    Below are some examples of the post:
+                        Post No 1: $240B stablecoin mcap incoming and u think we're early?\n @circle got that abu dhabi green light + @MetaMask letting u spend aUSDC anywhere... combine that with 2B fresh usdt minted on eth and 12% apy on coinbase \n regulatory cope incoming from places that missed the boat fr        
+                        Post No 2: 51m alpaca liq cascade just starting fam\n bybit closes in 13hrs btw
+                        Post No 3: soon we'll have an etf for every pixel in the doge logo
+                        Post No 4: eigenlayer x lombard just created the most unhinged yield stack in history\n btc maxis can now earn dual yields through LBTC restaking
+                            some Numbers:
+                            • $1.6T btc market possibly entering eth restaking
+                            • $7B current eigen TVL
+                            • proper slashing live since apr 17
+                            • layerzero
+             
+                    Note Please follow the post example format and do not include any extra information or explanation.
+                    Here is the Context: {latest_news} 
+                """}
         ]
 
         text = tokenizer.apply_chat_template(
@@ -102,14 +120,14 @@ def info_extracor(user_input, data):
         )
 
         model_inputs = tokenizer([text], return_tensors="pt").to(model.device)
-
         generated_ids = model.generate(**model_inputs, max_length=4096)
-
         generated_ids = [output_ids[len(input_ids):] for input_ids, output_ids in zip(model_inputs.input_ids, generated_ids)]
-
         response = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
 
         return response
-    
+
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Model response is not valid JSON: {e}\nRaw response: {response}")
     except Exception as e:
-        raise RuntimeError(f"Extraction Information is failed: {e}")
+        raise RuntimeError(f"Classification failed: {e}")
+    

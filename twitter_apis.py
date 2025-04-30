@@ -23,9 +23,20 @@ client = tweepy.Client(
     access_token_secret=access_token_secret,
     wait_on_rate_limit=True
 )
-
+# ----------------> Get Me <--------------------
+def get_my_user_id():
+    """Retrieve the authenticated user's ID."""
+    try:
+        user = client.get_me()
+        print(user)
+        return user.data.id if user.data else None
+    except Exception as e:
+        print(f"An error occurred while retrieving user ID: {e}")
+        return None
+    
+user_name  = get_my_user_id()
 # ----------------> Post Tweets <----------------
-def post_tweets(client, text, media_paths=None):
+def post_tweets(text, media_paths=None):
     auth = tweepy.OAuth1UserHandler(
         consumer_key,
         consumer_secret,
@@ -185,3 +196,77 @@ def filter_recent_replies(replies, hours=15):
     )
 
     return recent_replies
+
+# ----------------> Filter unreplied tweets  <----------------
+def filter_unreplied_tweets(tweets, my_username=user_name):
+    client = tweepy.Client(bearer_token=bearer_token, wait_on_rate_limit=True)
+    unreplied = []
+
+    for tweet in tweets:
+        tweet_id = tweet['tweet_id']
+        query = f'conversation_id:{tweet_id} -is:retweet'
+
+        try:
+            found_reply = False
+            for response in tweepy.Paginator(
+                client.search_recent_tweets,
+                query=query,
+                tweet_fields=['author_id', 'created_at'],
+                expansions='author_id',
+                user_fields=['username'],
+                max_results=100
+            ):
+                if response.data:
+                    users = {u['id']: u for u in response.includes['users']}
+                    for reply in response.data:
+                        author = users.get(reply.author_id)
+                        if author and author.username.lower() == my_username.lower():
+                            found_reply = True
+                            break
+                if found_reply:
+                    break
+
+            if not found_reply:
+                unreplied.append(tweet)
+
+        except Exception as e:
+            return f"Error checking tweet {tweet_id}: {e}"
+
+    return unreplied
+
+# ----------------> Reply to tweets <---------------
+def reply_to_tweet(tweet_id, reply_text):
+
+    # Post the reply
+    response = client.create_tweet(
+        text=reply_text,
+        in_reply_to_tweet_id=tweet_id
+    )
+
+    print(f"Reply posted: https://twitter.com/user/status/{response.data['id']}")
+    return f"Successfully posted a reply: {response.data['id']}"
+
+# ----------------> Extract mentions  <----------------
+def extract_mentions():
+    # client = tweepy.Client(bearer_token=bearer_token)
+    username=user_name
+    user = client.get_user(username=username)
+    user_id = user.data.id
+
+    mentions = client.get_users_mentions(id=user_id, max_results=100, expansions='author_id', tweet_fields='created_at')
+
+    mention_details = []
+
+    if mentions.data:
+        author_ids = {user.id: user.username for user in mentions.includes['users']}
+
+        for tweet in mentions.data:
+            author_username = author_ids.get(tweet.author_id, 'Unknown')
+            mention_details.append({
+                'username': author_username,
+                'tweet_id': tweet.id,
+                'text': tweet.text,
+                'created_at': tweet.created_at
+            })
+
+    return mention_details
