@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from contextlib import asynccontextmanager
 import os
 from dotenv import load_dotenv
@@ -7,10 +7,58 @@ from classifier import classifier_model, twitter_post_writer
 from twitter_apis import post_tweets, get_latest_top3_posts, get_replies_to_tweets, extract_usernames_from_excel, filter_replies_by_usernames, filter_recent_replies, filter_unreplied_tweets, reply_to_tweet, extract_mentions
 from fastapi.responses import JSONResponse
 import traceback
-
 load_dotenv()
 import tweepy
+import logging
+print("Done")
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+
+# from apscheduler.schedulers.asyncio import AsyncIOScheduler
+# from apscheduler.triggers.interval import IntervalTrigger
+# import asyncio
+
+# scheduler = AsyncIOScheduler()
+
+# async def scheduled_post_tweet(app: FastAPI):
+#     request = Request({"type": "http", "app": app})
+#     await post_tweet(request)
+
+# async def scheduled_reply_to_recent(app: FastAPI):
+#     request = Request({"type": "http", "app": app})
+#     await reply_to_recent_tweets(request)
+
+# async def scheduled_reply_to_mention(app: FastAPI):
+#     request = Request({"type": "http", "app": app})
+#     await reply_to_mention_tweets(request)
+
+# @asynccontextmanager
+# async def lifespan(app: FastAPI):
+#     model_id = os.getenv("MODEL_ID")
+#     model, tokenizer = load_fine_tuned_model(model_id)
+#     app.state.model = model
+#     app.state.tokenizer = tokenizer
+#     app.state.auth = tweepy.OAuth1UserHandler(
+#         consumer_key=os.getenv("CONSUMER_API_KEY"),
+#         consumer_secret=os.getenv("CONSUMER_API_SECRET"),
+#         callback="http://127.0.0.1:8000/callback"
+#     )
+
+#     # Schedule tasks
+#     scheduler.add_job(scheduled_post_tweet, IntervalTrigger(hours=8), args=[app])
+#     scheduler.add_job(scheduled_reply_to_recent, IntervalTrigger(hours=2), args=[app])
+#     scheduler.add_job(scheduled_reply_to_mention, IntervalTrigger(hours=5), args=[app])
+#     scheduler.start()
+
+#     yield
+
+#     scheduler.shutdown(wait=False)
+#     del app.state.model
+#     del app.state.tokenizer
+#     del app.state.auth
 
 # -----> Fastapi Setup <----- #
 print("Loading FastAPI...")
@@ -20,12 +68,65 @@ async def lifespan(app: FastAPI):
     model, tokenizer = load_fine_tuned_model(model_id)
     app.state.model = model
     app.state.tokenizer = tokenizer
+    # Initialize OAuth1UserHandler for OAuth flow
+    app.state.auth = tweepy.OAuth1UserHandler(
+        consumer_key=os.getenv("CONSUMER_API_KEY"),
+        consumer_secret=os.getenv("CONSUMER_API_SECRET"),
+        callback="http://127.0.0.1:8000/callback"
+    )
     yield
     del app.state.model
     del app.state.tokenizer
-
+    del app.state.auth
 app = FastAPI(lifespan=lifespan)
 
+# -----> OAuth Flow Initiation API <----- #
+@app.get("/start-oauth", summary="Start OAuth Flow", response_description="URL to authorize the app")
+async def start_oauth(request: Request):
+    try:
+        auth = request.app.state.auth
+        auth_url = auth.get_authorization_url()
+        return {
+            "success": True,
+            "response": {
+                "message": "Visit this URL to authorize the app",
+                "auth_url": auth_url
+            }
+        }
+    except tweepy.TweepyException as e:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "error": {
+                    "message": str(e)
+                }
+            }
+        )
+
+# -----> OAuth Callback API <----- #
+@app.get("/callback", summary="Handle OAuth Callback", response_description="Access tokens from OAuth flow")
+async def oauth_callback(request: Request, oauth_token: str, oauth_verifier: str):
+    try:
+        auth = request.app.state.auth
+        auth.request_token = {"oauth_token": oauth_token}
+        access_token, access_token_secret = auth.get_access_token(oauth_verifier)
+        
+        # Save tokens to .env (optional, for convenience)
+        with open(".env", "a") as f:
+            f.write(f"\nACCESS_TOKEN={access_token}\nACCESS_TOKEN_SECRET={access_token_secret}\n")
+        
+        return {
+            "success": True,
+            "response": {
+                "message": "OAuth flow completed. Tokens saved to .env.",
+                "access_token": access_token,
+                "access_token_secret": access_token_secret
+            }
+        }
+    except tweepy.TweepyException as e:
+        raise HTTPException(status_code=400, detail=str(e))
+################################################################################################
 
 # -----> MOP-Bot Response Generation API <----- #
 @app.get("/bot-response", summary="Generate Bot Response", response_description="The generated response from the model.")
@@ -95,6 +196,20 @@ async def post_tweet(request: Request):
         print("Tweet Content: ", tweet_content)
 
         response = post_tweets(tweet_content)
+        
+        # Handle string response (backward compatibility)
+        if isinstance(response, str):
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "success": False,
+                    "error": {
+                        "message": response
+                    }
+                }
+            )
+        
+        # Handle dictionary response
         if response.get("error"):
             return JSONResponse(
                 status_code=400,
@@ -110,7 +225,8 @@ async def post_tweet(request: Request):
             "success": True,
             "response": {
                 "message": "Tweet posted successfully.",
-                "tweet": tweet_content
+                "tweet": tweet_content,
+                "tweet_id": response.get("tweet_id")
             }
         }
 
@@ -135,80 +251,190 @@ async def reply_to_recent_tweets(request: Request):
         tokenizer = request.app.state.tokenizer
 
         list_of_posts = get_latest_top3_posts()
-        posts = [post['tweet_id'] for post in list_of_posts] 
+        logger.info(f"get_latest_top3_posts returned: {list_of_posts}")
+
+        # Check for error response
+        if isinstance(list_of_posts, dict) and "error" in list_of_posts:
+            logger.error(f"Error in get_latest_top3_posts: {list_of_posts['error']}")
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "success": False,
+                    "error": {
+                        "message": list_of_posts["error"]
+                    }
+                }
+            )
+
+        # Validate list_of_posts
+        if not isinstance(list_of_posts, list):
+            logger.error(f"Expected list_of_posts to be a list, got {type(list_of_posts)}")
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "success": False,
+                    "error": {
+                        "message": "Invalid response from get_latest_top3_posts: expected a list"
+                    }
+                }
+            )
+
+        # Ensure each post is a dictionary with tweet_id
+        posts = []
+        for post in list_of_posts:
+            if not isinstance(post, dict) or 'tweet_id' not in post:
+                logger.error(f"Invalid post format: {post}")
+                continue
+            posts.append(post)
+
+        if not posts:
+            logger.info("No valid posts found to process")
+            return {
+                "success": True,
+                "response": {
+                    "message": "No recent posts to reply to.",
+                    "replied_tweets": []
+                }
+            }
 
         list_of_replies = get_replies_to_tweets(posts)
+        logger.info(f"Retrieved {len(list_of_replies)} replies")
         usernames = extract_usernames_from_excel()
         usernames_filtered_replies = filter_replies_by_usernames(list_of_replies, usernames)
 
         time_filtered_replies = filter_recent_replies(usernames_filtered_replies)
         unreplied_tweets = filter_unreplied_tweets(time_filtered_replies)
 
+        replied_tweets = []
         for tweet in unreplied_tweets:
             query = tweet['text']
             tweet_id = tweet['tweet_id']
-            response = inference(model, tokenizer, query)
-            reply_to_tweet(tweet_id, response)
+            parent_post = tweet['parent_post_text']
+            response, classification, context = inference(model, tokenizer, query, parent_post)
 
+            reply_result = reply_to_tweet(tweet_id, response)
+
+            if reply_result.get("success"):
+                logger.info(f"Replied to tweet {tweet_id}")
+                replied_tweets.append(tweet_id)
+            else:
+                logger.error(f"Failed to reply to tweet {tweet_id}: {reply_result.get('error')}")
+
+        logger.info(f"Replied to {len(replied_tweets)} recent tweets")
         return {
             "success": True,
             "response": {
                 "message": "Replies posted successfully.",
-                "replied_tweets": [tweet['tweet_id'] for tweet in unreplied_tweets]
+                "replied_tweets": replied_tweets
             }
         }
 
     except Exception as e:
-        error_message = str(e)
+        logger.error(f"Error in reply_to_recent_tweets: {e}")
         traceback.print_exc()
         return JSONResponse(
             status_code=500,
             content={
                 "success": False,
                 "error": {
-                    "message": error_message
+                    "message": str(e)
                 }
             }
         )
 
-# -------------> Reply to (who mention me) API  <------------- #
-@app.post("/reply-to-mention", summary="Reply to mention Tweets", response_description="Replies posted to mention successfully.")
+# -----> Reply to Mention Tweets API <----- #
+@app.post("/reply-to-mention", summary="Reply to Mention Tweets", response_description="Replies posted to mentions successfully.")
 async def reply_to_mention_tweets(request: Request):
     try:
         model = request.app.state.model
         tokenizer = request.app.state.tokenizer
 
         list_of_replies = extract_mentions()
+        logger.info(f"extract_mentions returned: {list_of_replies}")
+
+        # Validate list_of_replies
+        if not isinstance(list_of_replies, list):
+            logger.error(f"Expected list_of_replies to be a list, got {type(list_of_replies)}")
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "success": False,
+                    "error": {
+                        "message": "Invalid response from extract_mentions: expected a list"
+                    }
+                }
+            )
+
         usernames = extract_usernames_from_excel()
         usernames_filtered_replies = filter_replies_by_usernames(list_of_replies, usernames)
+        logger.info(f"Filtered {len(usernames_filtered_replies)} replies by usernames")
 
         time_filtered_replies = filter_recent_replies(usernames_filtered_replies)
-        unreplied_tweets = filter_unreplied_tweets(time_filtered_replies)
+        logger.info(f"Filtered {len(time_filtered_replies)} recent replies")
 
+        unreplied_tweets = filter_unreplied_tweets(time_filtered_replies)
+        logger.info(f"Found {len(unreplied_tweets)} unreplied tweets: {unreplied_tweets}")
+
+        if not unreplied_tweets:
+            logger.info("No unreplied mentions found to process")
+            return {
+                "success": True,
+                "response": {
+                    "message": "No unreplied mentions to reply to.",
+                    "replied_tweets": []
+                }
+            }
+
+        replied_tweets = []
         for tweet in unreplied_tweets:
             query = tweet['text']
             tweet_id = tweet['tweet_id']
-            response = inference(model, tokenizer, query)
-            reply_to_tweet(tweet_id, response)
+            parent_post = tweet['parent_post_text']
+            logger.info(f"Processing mention {tweet_id}, query: {query}")
 
+            # Validate query
+            if not query or not isinstance(query, str):
+                logger.error(f"Invalid query for mention {tweet_id}: {query}")
+                continue
+
+            try:
+                # Use try-except to handle inference errors
+                response, classification, context = inference(model, tokenizer, query, parent_post)
+                logger.info(f"Inference output for mention {tweet_id}: response={response}")
+            except Exception as e:
+                logger.error(f"Inference failed for mention {tweet_id}: {e}")
+                continue
+
+            # Validate response
+            if not response or not isinstance(response, str):
+                logger.error(f"Invalid inference response for mention {tweet_id}: {response}")
+                continue
+
+            reply_result = reply_to_tweet(tweet_id, response)
+            if reply_result.get("success"):
+                logger.info(f"Replied to mention {tweet_id} with tweet_id {reply_result.get('tweet_id')}")
+                replied_tweets.append(tweet_id)
+            else:
+                logger.error(f"Failed to reply to mention {tweet_id}: {reply_result.get('error')}")
+
+        logger.info(f"Replied to {len(replied_tweets)} mention tweets")
         return {
             "success": True,
             "response": {
-                "message": "Replies posted to mention successfully.",
-                "replied_tweets": [tweet['tweet_id'] for tweet in unreplied_tweets]
+                "message": "Replies posted to mentions successfully.",
+                "replied_tweets": replied_tweets
             }
         }
 
     except Exception as e:
-        error_message = str(e)
+        logger.error(f"Error in reply_to_mention_tweets: {e}")
         traceback.print_exc()
         return JSONResponse(
             status_code=500,
             content={
                 "success": False,
                 "error": {
-                    "message": error_message
+                    "message": str(e)
                 }
             }
         )
-

@@ -6,7 +6,11 @@ import os
 import pandas as pd
 from urllib.parse import urlparse, unquote
 from datetime import datetime, timedelta, timezone
+import logging
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 load_dotenv()
 
 consumer_key = os.getenv("CONSUMER_API_KEY")
@@ -14,6 +18,8 @@ consumer_secret = os.getenv("CONSUMER_API_SECRET")
 access_token = os.getenv("ACCESS_TOKEN")
 access_token_secret = os.getenv("ACCESS_TOKEN_SECRET")
 bearer_token = os.getenv("BEARER_TOKEN")
+
+logger.info(f"Credentials: consumer_key={consumer_key[:4]}..., access_token={access_token[:4]}..., bearer_token={bearer_token[:4]}...")
 
 client = tweepy.Client(
     bearer_token=bearer_token,
@@ -25,78 +31,65 @@ client = tweepy.Client(
 )
 # ----------------> Get Me <--------------------
 def get_my_user_id():
-    """Retrieve the authenticated user's ID."""
     try:
         user = client.get_me()
-        print(user)
+        logger.info(f"Authenticated user: {user.data.username}")
         return user.data.id if user.data else None
-    except Exception as e:
-        print(f"An error occurred while retrieving user ID: {e}")
+    except tweepy.TweepyException as e:
+        logger.error(f"Error retrieving user ID: {e}")
         return None
-    
-user_name  = get_my_user_id()
+
+user_name = get_my_user_id()
 # ----------------> Post Tweets <----------------
 def post_tweets(text, media_paths=None):
-    auth = tweepy.OAuth1UserHandler(
-        consumer_key,
-        consumer_secret,
-        access_token,
-        access_token_secret
-    )
-    api = tweepy.API(auth)
+    try:
+        if not text or not isinstance(text, str):
+            return {"error": "Tweet text must be a non-empty string"}
 
-    media_ids = []
-    if media_paths:
-        for media_path in media_paths:
-            if os.path.isfile(media_path):
-                try:
+        media_ids = []
+        if media_paths:
+            auth = tweepy.OAuth1UserHandler(consumer_key, consumer_secret, access_token, access_token_secret)
+            api = tweepy.API(auth)
+            for media_path in media_paths:
+                if os.path.isfile(media_path):
                     media = api.media_upload(media_path)
                     media_ids.append(media.media_id)
-                except Exception as e:
-                    print(f"Error uploading {media_path}: {e}")
-            else:
-                print(f"File not found: {media_path}")
+                else:
+                    return {"error": f"File not found: {media_path}"}
 
-    try:
         if media_ids:
-            response = client.create_tweet(
-                text=text,
-                media_ids=media_ids,
-                user_auth=True
-            )
+            response = client.create_tweet(text=text, media_ids=media_ids)
         else:
-            response = client.create_tweet(
-                text=text,
-                user_auth=True
-            )
+            response = client.create_tweet(text=text)
+        
         print(f"Tweet posted successfully: https://twitter.com/user/status/{response.data['id']}")
-        return response
+        return {"success": True, "tweet_id": response.data["id"]}
+    except tweepy.TweepyException as e:
+        print(f"An error occurred while posting the tweet: {e}")
+        return {"error": str(e)}
     except Exception as e:
-        return f"An error occurred while posting the tweet: {e}"
+        print(f"Unexpected error in post_tweets: {e}")
+        return {"error": str(e)}
     
 
 # ----------------> Lateste 3 Posts <----------------
 def get_latest_top3_posts():
-    # client = tweepy.Client(bearer_token=bearer_token, wait_on_rate_limit=True)
-
     try:
-        userr = client.get_me()
-        username = userr.data.name if user.data else "MIND_agent"
-        user = client.get_user(username=username)
-        user_id = user.data.id
-    except Exception as e:
-        return f"Failed to get user ID: {e}"
+        user = client.get_me()
+        user_id = user.data.id if user.data else None
+        if not user_id:
+            logger.error("Failed to get user ID")
+            return {"error": "Failed to get user ID"}
 
-    try:
         response = client.get_users_tweets(
             id=user_id,
-            max_results=10,
+            max_results=5,
             tweet_fields=['created_at', 'public_metrics'],
             exclude=['retweets', 'replies']
         )
 
         tweets = response.data if response.data else []
-        top3 = sorted(tweets, key=lambda x: x.created_at, reverse=True)[:3]
+        top3 = sorted(tweets, key=lambda x: x.created_at, reverse=True)[:1]
 
         result = []
         for tweet in top3:
@@ -108,18 +101,25 @@ def get_latest_top3_posts():
                 'retweet_count': tweet.public_metrics['retweet_count']
             })
 
+        logger.info(f"Returning {len(result)} recent posts: {result}")
         return result
 
+    except tweepy.TweepyException as e:
+        logger.error(f"Failed to get tweets: {e}")
+        return {"error": f"Failed to get tweets: {str(e)}"}
     except Exception as e:
-        return f"Failed to get tweets: {e}"
+        logger.error(f"Unexpected error in get_latest_top3_posts: {e}")
+        return {"error": f"Unexpected error: {str(e)}"}
     
 # ----------------> Extracting Tweet-Replies <----------------
-def get_replies_to_tweets(tweet_ids):
-    # client = tweepy.Client(bearer_token=bearer_token, wait_on_rate_limit=True)
+def get_replies_to_tweets(tweets_info):
     all_replies = []
 
-    for tweet_id in tweet_ids:
+    for tweet in tweets_info:
+        tweet_id = tweet['tweet_id']
+        post_text = tweet['text']
         query = f'conversation_id:{tweet_id} -is:retweet'
+
         try:
             for response in tweepy.Paginator(
                 client.search_recent_tweets,
@@ -131,20 +131,22 @@ def get_replies_to_tweets(tweet_ids):
             ):
                 if response.data:
                     users = {u['id']: u for u in response.includes['users']}
-                    for tweet in response.data:
-                        author = users.get(tweet.author_id)
+                    for reply in response.data:
+                        author = users.get(reply.author_id)
                         if author:
                             all_replies.append({
                                 'conversation_id': tweet_id,
-                                'tweet_id': tweet.id,
+                                'parent_post_text': post_text,
+                                'tweet_id': reply.id,
                                 'username': author.username,
-                                'created_at': tweet.created_at,
-                                'text': tweet.text
+                                'created_at': reply.created_at,
+                                'text': reply.text
                             })
         except Exception as e:
             print(f"An error occurred while fetching replies for tweet {tweet_id}: {e}")
 
     return all_replies
+
 
 # ----------------> Extracting Usernames from Excel <----------------
 def extract_usernames_from_excel():
@@ -180,7 +182,8 @@ def filter_replies_by_usernames(replies, target_usernames):
                 'tweet_id': reply['tweet_id'],
                 'username': reply['username'],
                 'created_at': reply['created_at'],
-                'text': reply['text']
+                'text': reply['text'],
+                'parent_post_text': reply['parent_post_text']
             })
 
     return filtered_replies
@@ -236,37 +239,97 @@ def filter_unreplied_tweets(tweets, my_username=user_name):
 
 # ----------------> Reply to tweets <---------------
 def reply_to_tweet(tweet_id, reply_text):
+    try:
+        if not reply_text or not isinstance(reply_text, str):
+            logger.error("Invalid reply text: must be a non-empty string")
+            return {"error": "Reply text must be a non-empty string"}
+        if len(reply_text) > 280:
+            logger.error("Reply text exceeds 280 characters")
+            return {"error": "Reply text exceeds 280 characters"}
 
-    # Post the reply
-    response = client.create_tweet(
-        text=reply_text,
-        in_reply_to_tweet_id=tweet_id
-    )
+        logger.info(f"Posting reply to tweet {tweet_id}: {reply_text[:50]}...")
+        response = client.create_tweet(
+            text=reply_text,
+            in_reply_to_tweet_id=tweet_id
+        )
 
-    print(f"Reply posted: https://twitter.com/user/status/{response.data['id']}")
-    return f"Successfully posted a reply: {response.data['id']}"
+        logger.info(f"Reply posted: https://twitter.com/user/status/{response.data['id']}")
+        return {
+            "success": True,
+            "tweet_id": response.data["id"]
+        }
+    except tweepy.TweepyException as e:
+        logger.error(f"Failed to post reply to tweet {tweet_id}: {e}")
+        return {"error": f"Failed to post reply: {str(e)}"}
+    except Exception as e:
+        logger.error(f"Unexpected error in reply_to_tweet: {e}")
+        return {"error": f"Unexpected error: {str(e)}"}
 
 # ----------------> Extract mentions  <----------------
 def extract_mentions():
-    # client = tweepy.Client(bearer_token=bearer_token)
-    username=user_name
-    user = client.get_user(username=username)
-    user_id = user.data.id
+    try:
+        username = "Shift1646020"
 
-    mentions = client.get_users_mentions(id=user_id, max_results=100, expansions='author_id', tweet_fields='created_at')
+        # Get user ID
+        user = client.get_user(username=username)
+        if not user.data:
+            return []
+        user_id = user.data.id
 
-    mention_details = []
+        # Fetch mentions
+        mentions = client.get_users_mentions(
+            id=user_id,
+            max_results=100,
+            expansions=['author_id', 'referenced_tweets.id.author_id'],
+            tweet_fields=['created_at', 'referenced_tweets'],
+            user_fields=['username']
+        )
 
-    if mentions.data:
-        author_ids = {user.id: user.username for user in mentions.includes['users']}
+        mention_details = []
+        if not mentions.data:
+            return mention_details
 
+        # Map author IDs to usernames
+        author_ids = {user.id: user.username for user in mentions.includes.get('users', [])}
+
+        # Process each mention
         for tweet in mentions.data:
-            author_username = author_ids.get(tweet.author_id, 'Unknown')
-            mention_details.append({
-                'username': author_username,
-                'tweet_id': tweet.id,
-                'text': tweet.text,
-                'created_at': tweet.created_at
-            })
 
-    return mention_details
+            author_username = author_ids.get(tweet.author_id, 'Unknown')
+            parent_author_id = None
+            parent_post_text = None
+
+            if tweet.referenced_tweets:
+                for ref_tweet in tweet.referenced_tweets:
+                    if ref_tweet.type in ['replied_to', 'quoted']:
+                        ref_tweet_id = ref_tweet.id
+                        ref_tweet_data = client.get_tweet(
+                            id=ref_tweet_id,
+                            tweet_fields=['author_id', 'text']
+                        )
+                        if ref_tweet_data.data:
+                            parent_author_id = ref_tweet_data.data.author_id
+                            parent_post_text = ref_tweet_data.data.text
+                        else:
+                            continue
+            else:
+                parent_author_id = tweet.author_id
+                parent_post_text = tweet.text
+
+            if parent_author_id and parent_author_id != user_id:
+                mention_details.append({
+                    'username': author_username,
+                    'tweet_id': tweet.id,
+                    'text': tweet.text,
+                    'created_at': tweet.created_at,
+                    'parent_post_text': parent_post_text
+                })
+            else:
+                print(f"Skipping mention: tweet_id={tweet.id}, parent_author_id={parent_author_id} is user or invalid")
+
+        return mention_details
+
+    except tweepy.TweepyException as e:
+        return []
+    except Exception as e:
+        return []

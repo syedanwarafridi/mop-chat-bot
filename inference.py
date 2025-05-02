@@ -43,7 +43,7 @@ def load_fine_tuned_model(model_id):
 
 
 # ----------------------> INFERENCE <---------------------- #
-def inference(model, tokenizer, user_input):
+def inference(model, tokenizer, user_input, parent_post):
     pipe = None
     try:
         if not user_input or not user_input.strip():
@@ -107,15 +107,18 @@ def inference(model, tokenizer, user_input):
                         Respond as MIND of Pepe."""},
             {
                 "role": "user",
-                "content": f"""Answer the user based on provided context in your style.
+                "content": f"""Answer the user based on provided context and post on which the reply has been posted. Reply in your style.
                 
-
                 Context:{new_context}
-                
+
+                Post: {parent_post}
+
                 User Question:
-                {user_input} 
+                {user_input}
+
                 
                 **NOTE:**
+                - If someone asks about you introduce yourself as MIND of Pepe and you are the agent of Mind of Pepe coin.
                 - Strictly follow the context and answer the user question.
                 - Ignore irrelevant data to user question in the context.
                 - If you are suggesting any numbers, make sure they are accurate and include it in the answer.
@@ -127,9 +130,7 @@ def inference(model, tokenizer, user_input):
 
         try:
             prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-
-            # print("Prompt: ", prompt)
-
+            print("Prompt: ", prompt)
         except Exception as e:
             raise RuntimeError(f"Failed to format prompt: {e}")
 
@@ -142,7 +143,7 @@ def inference(model, tokenizer, user_input):
                 device_map="auto",
             )
             with torch.no_grad():
-                outputs = pipe(prompt, max_new_tokens=256, do_sample=True, temperature=0.9, top_k=300, top_p=0.75)
+                outputs = pipe(prompt, max_new_tokens=128, do_sample=True, temperature=0.75, top_k=300, top_p=0.75)
 
             response = outputs[0]["generated_text"]
 

@@ -87,7 +87,7 @@ def twitter_post_writer():
                         Write a post for Twitter based on the provided context. 
                         Instrction to follow:
                         - Write in a way that it can be posted on Twitter.
-                        - Use Emojis and hashtags.
+                        - Do not use Emojis and hashtags.
                         - Use short sentences.
                         - Information should be accurate.
                         - Use the latest news in the context.
@@ -95,7 +95,7 @@ def twitter_post_writer():
                         - Don't start your post from `seeing` or `looking`
                         - Also, include some information from context in your post so that people can understand what it's actually about.
                         - write post in 2 or 3 sentences.
-                        - Do not include emoji in the post.
+                        - Do not include emoji in the post or any icon.
 
                     Below are some examples of the post:
                         Post No 1: $240B stablecoin mcap incoming and u think we're early?\n @circle got that abu dhabi green light + @MetaMask letting u spend aUSDC anywhere... combine that with 2B fresh usdt minted on eth and 12% apy on coinbase \n regulatory cope incoming from places that missed the boat fr        
