@@ -10,7 +10,8 @@ import traceback
 import tweepy
 import logging
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.triggers.interval import IntervalTrigger
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
 from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv()
@@ -47,10 +48,25 @@ async def lifespan(app: FastAPI):
         callback="http://127.0.0.1:8000/callback"
     )
 
-    # Schedule tasks
-    scheduler.add_job(scheduled_post_tweet, IntervalTrigger(hours=2), args=[app])
-    scheduler.add_job(scheduled_reply_to_recent, IntervalTrigger(minutes=4), args=[app])
-    scheduler.add_job(scheduled_reply_to_mention, IntervalTrigger(minutes=10), args=[app])
+    # Post Tweet – 3 times a day
+    scheduler.add_job(scheduled_post_tweet, CronTrigger(hour=0, minute=0), args=[app])
+    scheduler.add_job(scheduled_post_tweet, CronTrigger(hour=8, minute=10), args=[app])
+    scheduler.add_job(scheduled_post_tweet, CronTrigger(hour=16, minute=20), args=[app])
+
+    # Reply to Recent – 7 times a day
+    scheduler.add_job(scheduled_reply_to_recent, CronTrigger(hour=1, minute=0), args=[app])
+    scheduler.add_job(scheduled_reply_to_recent, CronTrigger(hour=4, minute=20), args=[app])
+    scheduler.add_job(scheduled_reply_to_recent, CronTrigger(hour=7, minute=40), args=[app])
+    scheduler.add_job(scheduled_reply_to_recent, CronTrigger(hour=11, minute=0), args=[app])
+    scheduler.add_job(scheduled_reply_to_recent, CronTrigger(hour=14, minute=20), args=[app])
+    scheduler.add_job(scheduled_reply_to_recent, CronTrigger(hour=17, minute=40), args=[app])
+    scheduler.add_job(scheduled_reply_to_recent, CronTrigger(hour=21, minute=0), args=[app])
+
+    # Reply to Mention – 3 times a day
+    scheduler.add_job(scheduled_reply_to_mention, CronTrigger(hour=2, minute=30), args=[app])
+    scheduler.add_job(scheduled_reply_to_mention, CronTrigger(hour=10, minute=30), args=[app])
+    scheduler.add_job(scheduled_reply_to_mention, CronTrigger(hour=18, minute=30), args=[app])
+
     scheduler.start()
 
     yield
@@ -428,3 +444,7 @@ async def reply_to_mention_tweets(request: Request):
                 }
             }
         )
+    
+
+# if __name__ == "__main__":
+#     app.run(host="0.0.0.0", port=7860)
