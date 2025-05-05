@@ -2,83 +2,74 @@ from fastapi import FastAPI, Request, HTTPException
 from contextlib import asynccontextmanager
 import os
 from dotenv import load_dotenv
-from inference import load_fine_tuned_model, inference
+from inference import load_fine_tuned_model, x_inference, terminal_inference
 from classifier import classifier_model, twitter_post_writer
 from twitter_apis import post_tweets, get_latest_top3_posts, get_replies_to_tweets, extract_usernames_from_excel, filter_replies_by_usernames, filter_recent_replies, filter_unreplied_tweets, reply_to_tweet, extract_mentions
 from fastapi.responses import JSONResponse
 import traceback
-load_dotenv()
 import tweepy
 import logging
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.interval import IntervalTrigger
+from fastapi.middleware.cors import CORSMiddleware
+
+load_dotenv()
 print("Done")
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# -----> Schedular <----- #
+scheduler = AsyncIOScheduler()
 
+async def scheduled_post_tweet(app: FastAPI):
+    request = Request({"type": "http", "app": app})
+    await post_tweet(request)
 
-# from apscheduler.schedulers.asyncio import AsyncIOScheduler
-# from apscheduler.triggers.interval import IntervalTrigger
-# import asyncio
+async def scheduled_reply_to_recent(app: FastAPI):
+    request = Request({"type": "http", "app": app})
+    await reply_to_recent_tweets(request)
 
-# scheduler = AsyncIOScheduler()
-
-# async def scheduled_post_tweet(app: FastAPI):
-#     request = Request({"type": "http", "app": app})
-#     await post_tweet(request)
-
-# async def scheduled_reply_to_recent(app: FastAPI):
-#     request = Request({"type": "http", "app": app})
-#     await reply_to_recent_tweets(request)
-
-# async def scheduled_reply_to_mention(app: FastAPI):
-#     request = Request({"type": "http", "app": app})
-#     await reply_to_mention_tweets(request)
-
-# @asynccontextmanager
-# async def lifespan(app: FastAPI):
-#     model_id = os.getenv("MODEL_ID")
-#     model, tokenizer = load_fine_tuned_model(model_id)
-#     app.state.model = model
-#     app.state.tokenizer = tokenizer
-#     app.state.auth = tweepy.OAuth1UserHandler(
-#         consumer_key=os.getenv("CONSUMER_API_KEY"),
-#         consumer_secret=os.getenv("CONSUMER_API_SECRET"),
-#         callback="http://127.0.0.1:8000/callback"
-#     )
-
-#     # Schedule tasks
-#     scheduler.add_job(scheduled_post_tweet, IntervalTrigger(hours=8), args=[app])
-#     scheduler.add_job(scheduled_reply_to_recent, IntervalTrigger(hours=2), args=[app])
-#     scheduler.add_job(scheduled_reply_to_mention, IntervalTrigger(hours=5), args=[app])
-#     scheduler.start()
-
-#     yield
-
-#     scheduler.shutdown(wait=False)
-#     del app.state.model
-#     del app.state.tokenizer
-#     del app.state.auth
+async def scheduled_reply_to_mention(app: FastAPI):
+    request = Request({"type": "http", "app": app})
+    await reply_to_mention_tweets(request)
 
 # -----> Fastapi Setup <----- #
-print("Loading FastAPI...")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     model_id = os.getenv("MODEL_ID")
     model, tokenizer = load_fine_tuned_model(model_id)
     app.state.model = model
     app.state.tokenizer = tokenizer
-    # Initialize OAuth1UserHandler for OAuth flow
     app.state.auth = tweepy.OAuth1UserHandler(
         consumer_key=os.getenv("CONSUMER_API_KEY"),
         consumer_secret=os.getenv("CONSUMER_API_SECRET"),
         callback="http://127.0.0.1:8000/callback"
     )
+
+    # Schedule tasks
+    scheduler.add_job(scheduled_post_tweet, IntervalTrigger(hours=2), args=[app])
+    scheduler.add_job(scheduled_reply_to_recent, IntervalTrigger(minutes=4), args=[app])
+    scheduler.add_job(scheduled_reply_to_mention, IntervalTrigger(minutes=10), args=[app])
+    scheduler.start()
+
     yield
+
+    scheduler.shutdown(wait=False)
     del app.state.model
     del app.state.tokenizer
     del app.state.auth
+
 app = FastAPI(lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 # -----> OAuth Flow Initiation API <----- #
 @app.get("/start-oauth", summary="Start OAuth Flow", response_description="URL to authorize the app")
@@ -126,7 +117,6 @@ async def oauth_callback(request: Request, oauth_token: str, oauth_verifier: str
         }
     except tweepy.TweepyException as e:
         raise HTTPException(status_code=400, detail=str(e))
-################################################################################################
 
 # -----> MOP-Bot Response Generation API <----- #
 @app.get("/bot-response", summary="Generate Bot Response", response_description="The generated response from the model.")
@@ -143,7 +133,7 @@ async def get_bot_response(request: Request, query: str):
         model = request.app.state.model
         tokenizer = request.app.state.tokenizer
 
-        response = inference(model, tokenizer, query)
+        response = terminal_inference(model, tokenizer, query)
 
         return {
             "success": True,
@@ -310,7 +300,7 @@ async def reply_to_recent_tweets(request: Request):
             query = tweet['text']
             tweet_id = tweet['tweet_id']
             parent_post = tweet['parent_post_text']
-            response, classification, context = inference(model, tokenizer, query, parent_post)
+            response, classification, context = x_inference(model, tokenizer, query, parent_post)
 
             reply_result = reply_to_tweet(tweet_id, response)
 
@@ -399,7 +389,7 @@ async def reply_to_mention_tweets(request: Request):
 
             try:
                 # Use try-except to handle inference errors
-                response, classification, context = inference(model, tokenizer, query, parent_post)
+                response, classification, context = x_inference(model, tokenizer, query, parent_post)
                 logger.info(f"Inference output for mention {tweet_id}: response={response}")
             except Exception as e:
                 logger.error(f"Inference failed for mention {tweet_id}: {e}")
