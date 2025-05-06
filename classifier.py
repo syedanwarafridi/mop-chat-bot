@@ -79,26 +79,31 @@ def classifier_model(user_input):
 # ----------------------> Post Writer <---------------------- #
 def twitter_post_writer():
     try:
-        search_query = "What is the latest updates of the crypto market right now?"
+        search_query = "Latest news on crypto market, digital assets and blockchain" 
         latest_news = tavily_for_post(search_query)
+        print("Latest news for Twitter post:", latest_news)
         messages = [
             {"role": "system", "content": """You are MIND of Pepe coin agent, Your task is to Write post for Twitter based on the provided context."""},
             {"role": "user", "content": f"""
-                        Write a post for Twitter based on the provided context. 
-                        Instrction to follow:
-                        - Write in a way that it can be posted on Twitter.
+                    Write a post for Twitter based on the provided context
+                    1- Instructions to follow:
+                        - Keep word count strictly restricted to official tweet length of 280 characters
                         - Do not use Emojis and hashtags.
                         - Use short sentences.
                         - Information should be accurate.
-                        - Use the latest news in the context.
-                        - You will get different news in the context, so choose only one and write a post based on that.
+                        - Pick a random link from latest news in the context.
+		                - DO NOT tweet about latest prices
+                        - You will get different news in the context, so choose only one randomly and write a post based on that.
+		                - Prefer news about crypto markets, crypto policy, blockchain updates instead of prices.
                         - Don't start your post from `seeing` or `looking`
                         - Also, include some information from context in your post so that people can understand what it's actually about.
-                        - write post in 2 or 3 sentences.
+                        - Write post in 2 or 3 sentences.
                         - Do not include emoji in the post or any icon.
-
+                        - Include URL in the post if you think it's necessary.
+                        - Pick news randomly from the context and write a post based on that.
+                    
                     Below are some examples of the post:
-                        Post No 1: $240B stablecoin mcap incoming and u think we're early?\n @circle got that abu dhabi green light + @MetaMask letting u spend aUSDC anywhere... combine that with 2B fresh usdt minted on eth and 12% apy on coinbase \n regulatory cope incoming from places that missed the boat fr        
+                        Post No 1: $240B stablecoin mcap incoming and u think we're early?\n @circle got that abu dhabi green light + @MetaMask letting u spend aUSDC anywhere... combine that with 2B fresh usdt minted on eth and 12% apy on coinbase \n regulatory cope incoming from places that missed the boat fr
                         Post No 2: 51m alpaca liq cascade just starting fam\n bybit closes in 13hrs btw
                         Post No 3: soon we'll have an etf for every pixel in the doge logo
                         Post No 4: eigenlayer x lombard just created the most unhinged yield stack in history\n btc maxis can now earn dual yields through LBTC restaking
@@ -107,9 +112,11 @@ def twitter_post_writer():
                             • $7B current eigen TVL
                             • proper slashing live since apr 17
                             • layerzero
-             
-                    Note Please follow the post example format and do not include any extra information or explanation.
-                    Here is the Context: {latest_news} 
+                    Note: 
+                        - Follow the post example format and do not include any extra information or explanation.
+                        - Prefer news about crypto markets, crypto policy, blockchain updates instead of prices.
+                    
+                    Here is the Context/News: {latest_news} 
                 """}
         ]
 

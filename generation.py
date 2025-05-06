@@ -198,6 +198,7 @@ async def get_classifier_response(query: str):
 @app.post("/post-tweet", summary="Post a Tweet", response_description="The tweet content and status.")
 async def post_tweet(request: Request):
     try:
+       
         tweet_content = twitter_post_writer()
         print("Tweet Content: ", tweet_content)
 
