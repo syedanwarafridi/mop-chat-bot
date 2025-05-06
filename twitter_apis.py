@@ -333,3 +333,43 @@ def extract_mentions():
         return []
     except Exception as e:
         return []
+
+#  -----------------> STATS <---------------- #
+def get_my_tweets_and_replies():
+    user_response = client.get_me()
+    if user_response.data is None:
+        print("Authenticated user not found.")
+        return None
+    user_id = user_response.data.id
+
+    tweets = []
+    replies = []
+
+    for response in tweepy.Paginator(
+        client.get_users_tweets,
+        id=user_id,
+        tweet_fields=['created_at', 'in_reply_to_user_id'],
+        max_results=100,
+        exclude=['retweets']
+    ):
+        if response.data is None:
+            continue
+        for tweet in response.data:
+            if tweet.in_reply_to_user_id is None:
+                tweets.append(tweet)
+            else:
+                replies.append(tweet)
+
+    last_tweet_timestamp = max((tweet.created_at for tweet in tweets), default=None)
+    last_reply_timestamp = max((reply.created_at for reply in replies), default=None)
+
+    result = {
+        'total_tweets': len(tweets),
+        'total_replies': len(replies),
+        'last_tweet_timestamp': last_tweet_timestamp,
+        'last_reply_timestamp': last_reply_timestamp,
+        'tweets': [tweet.text for tweet in tweets],
+        'replies': [reply.text for reply in replies]
+    }
+
+    return result

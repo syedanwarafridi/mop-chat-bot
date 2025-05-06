@@ -4,6 +4,7 @@ import os
 from dotenv import load_dotenv
 from inference import load_fine_tuned_model, x_inference, terminal_inference
 from classifier import classifier_model, twitter_post_writer
+from retriver import get_combined_stats_with_api
 from twitter_apis import post_tweets, get_latest_top3_posts, get_replies_to_tweets, extract_usernames_from_excel, filter_replies_by_usernames, filter_recent_replies, filter_unreplied_tweets, reply_to_tweet, extract_mentions
 from fastapi.responses import JSONResponse
 import traceback
@@ -446,6 +447,35 @@ async def reply_to_mention_tweets(request: Request):
             }
         )
     
+# --------------------> Stats API < ---------------------------
+@app.get("/stats", summary="System Statistics", response_description="Aggregated stats from Twitter, RAG DB, and API.")
+async def stats():
+    try:
+        stats = get_combined_stats_with_api()
+        return {
+            "success": True,
+            "stats": stats
+        }
 
-# if __name__ == "__main__":
-#     app.run(host="0.0.0.0", port=7860)
+    except Exception as e:
+        logger.error(f"Error in /stats endpoint: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "error": {
+                    "message": str(e)
+                }
+            }
+        )
+
+# ------------------> System Health Check API <-------------------- #
+@app.get("/health", summary="Health Check", response_description="Returns health status of the service.")
+async def health_check():
+    return {
+        "success": True,
+        "response": {
+            "status": "ok",
+            "message": "Service is up and running."
+        }
+    }
