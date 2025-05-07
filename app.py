@@ -1,27 +1,22 @@
 import gradio as gr
-from inference import load_fine_tuned_model, inference
+from inference import load_fine_tuned_model, terminal_inference
 from dotenv import load_dotenv
 from retriver import last_update_api, update_api
 import os
 
-# Load environment variables
 load_dotenv()
-model_id = os.getenv('NEW_MODEL_ID')
+model_id = os.getenv('MODEL_ID')
 
-# Load the fine-tuned model and tokenizer
 model, tokenizer = load_fine_tuned_model(model_id)
 
-# Define the inference function
 def gradio_inference(user_input):
-    response, classification, context = inference(model, tokenizer, user_input)
+    response, classification, context = terminal_inference(model, tokenizer, user_input)
     return response, classification, context
 
-# Define the function to update the database
 def update_database():
     update_api()
     return last_update_api()
 
-# Create the Gradio interface using Blocks
 with gr.Blocks(css="""
     .orange-button {
         background-color: #ff7f0e !important;
@@ -51,5 +46,5 @@ with gr.Blocks(css="""
     user_input.submit(fn=gradio_inference, inputs=user_input, outputs=[response, classification, context])
     update_button.click(fn=update_database, outputs=last_updated)
 
-# Launch the app
-demo.launch()
+demo.launch(server_name="0.0.0.0", server_port=7860, share=False)
+
