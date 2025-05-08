@@ -205,7 +205,6 @@ async def post_tweet(request: Request):
 
         response = post_tweets(tweet_content)
         
-        # Handle string response (backward compatibility)
         if isinstance(response, str):
             return JSONResponse(
                 status_code=400,
@@ -217,7 +216,6 @@ async def post_tweet(request: Request):
                 }
             )
         
-        # Handle dictionary response
         if response.get("error"):
             return JSONResponse(
                 status_code=400,
@@ -261,7 +259,6 @@ async def reply_to_recent_tweets(request: Request):
         list_of_posts = get_latest_top3_posts()
         logger.info(f"get_latest_top3_posts returned: {list_of_posts}")
 
-        # Check for error response
         if isinstance(list_of_posts, dict) and "error" in list_of_posts:
             logger.error(f"Error in get_latest_top3_posts: {list_of_posts['error']}")
             return JSONResponse(
@@ -274,7 +271,6 @@ async def reply_to_recent_tweets(request: Request):
                 }
             )
 
-        # Validate list_of_posts
         if not isinstance(list_of_posts, list):
             logger.error(f"Expected list_of_posts to be a list, got {type(list_of_posts)}")
             return JSONResponse(
@@ -287,7 +283,6 @@ async def reply_to_recent_tweets(request: Request):
                 }
             )
 
-        # Ensure each post is a dictionary with tweet_id
         posts = []
         for post in list_of_posts:
             if not isinstance(post, dict) or 'tweet_id' not in post:
@@ -360,7 +355,6 @@ async def reply_to_mention_tweets(request: Request):
         list_of_replies = extract_mentions()
         logger.info(f"extract_mentions returned: {list_of_replies}")
 
-        # Validate list_of_replies
         if not isinstance(list_of_replies, list):
             logger.error(f"Expected list_of_replies to be a list, got {type(list_of_replies)}")
             return JSONResponse(
@@ -400,20 +394,17 @@ async def reply_to_mention_tweets(request: Request):
             parent_post = tweet['parent_post_text']
             logger.info(f"Processing mention {tweet_id}, query: {query}")
 
-            # Validate query
             if not query or not isinstance(query, str):
                 logger.error(f"Invalid query for mention {tweet_id}: {query}")
                 continue
 
             try:
-                # Use try-except to handle inference errors
                 response, classification, context = x_inference(model, tokenizer, query, parent_post)
                 logger.info(f"Inference output for mention {tweet_id}: response={response}")
             except Exception as e:
                 logger.error(f"Inference failed for mention {tweet_id}: {e}")
                 continue
 
-            # Validate response
             if not response or not isinstance(response, str):
                 logger.error(f"Invalid inference response for mention {tweet_id}: {response}")
                 continue

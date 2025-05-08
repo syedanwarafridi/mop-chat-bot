@@ -270,13 +270,11 @@ def extract_mentions():
     try:
         username = "Shift1646020"
 
-        # Get user ID
         user = client.get_user(username=username)
         if not user.data:
             return []
         user_id = user.data.id
 
-        # Fetch mentions
         mentions = client.get_users_mentions(
             id=user_id,
             max_results=100,
@@ -289,10 +287,8 @@ def extract_mentions():
         if not mentions.data:
             return mention_details
 
-        # Map author IDs to usernames
         author_ids = {user.id: user.username for user in mentions.includes.get('users', [])}
 
-        # Process each mention
         for tweet in mentions.data:
 
             author_username = author_ids.get(tweet.author_id, 'Unknown')

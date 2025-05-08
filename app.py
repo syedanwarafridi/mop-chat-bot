@@ -24,7 +24,7 @@ with gr.Blocks(css="""
         border: none;
     }
 """) as demo:
-    gr.Markdown("## Crypto Query Assistant")
+    gr.Markdown("## Mind of Pepe")
     gr.Markdown("Enter your query about cryptocurrencies to get a response, classification, and context.")
 
     with gr.Row():
