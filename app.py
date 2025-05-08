@@ -4,19 +4,26 @@ from dotenv import load_dotenv
 from retriver import last_update_api, update_api
 import os
 
+# Load environment variables
 load_dotenv()
 model_id = os.getenv('MODEL_ID')
+username = os.getenv('GRADIO_USERNAME')
+password = os.getenv('GRADIO_PASSWORD')
 
+# Load model and tokenizer
 model, tokenizer = load_fine_tuned_model(model_id)
 
+# Define inference function
 def gradio_inference(user_input):
     response, classification, context = terminal_inference(model, tokenizer, user_input)
     return response, classification, context
 
+# Define database update function
 def update_database():
     update_api()
     return last_update_api()
 
+# Build Gradio interface
 with gr.Blocks(css="""
     .orange-button {
         background-color: #ff7f0e !important;
@@ -41,10 +48,15 @@ with gr.Blocks(css="""
             classification = gr.Textbox(label="Classification")
             context = gr.Textbox(label="Context")
 
-    # Button click events
+    # Set up event handlers
     submit_button.click(fn=gradio_inference, inputs=user_input, outputs=[response, classification, context])
     user_input.submit(fn=gradio_inference, inputs=user_input, outputs=[response, classification, context])
     update_button.click(fn=update_database, outputs=last_updated)
 
-demo.launch(server_name="0.0.0.0", server_port=7860, share=False)
-
+# Launch the app with authentication
+demo.launch(
+    server_name="0.0.0.0",
+    server_port=7860,
+    share=False,
+    auth=(username, password)  # Password protection here
+)
