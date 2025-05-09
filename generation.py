@@ -5,9 +5,10 @@ from dotenv import load_dotenv
 from inference import load_fine_tuned_model, x_inference, terminal_inference
 from classifier import classifier_model, twitter_post_writer
 from retriver import get_combined_stats_with_api
-from twitter_apis import post_tweets, get_latest_top3_posts, get_replies_to_tweets, extract_usernames_from_excel, filter_replies_by_usernames, filter_recent_replies, filter_unreplied_tweets, reply_to_tweet, extract_mentions
+from twitter_apis import post_tweets, get_latest_top3_posts, get_replies_to_tweets, extract_usernames_from_excel, filter_replies_by_usernames, filter_recent_replies, filter_unreplied_tweets, reply_to_tweet, extract_mentions, add_username_to_excel
 from fastapi.responses import JSONResponse
 import traceback
+from pydantic import BaseModel
 import tweepy
 import logging
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -460,6 +461,32 @@ async def stats():
             }
         )
 
+# --------------------> Whitelist the user < ---------------------------
+class UsernameRequest(BaseModel):
+    username: str
+
+@app.post("/add-username", summary="Add a new username", response_description="Username added successfully.")
+async def add_username(request: Request, payload: UsernameRequest):
+    try:
+        username = payload.username.strip()
+        if not username:
+            raise HTTPException(status_code=400, detail="Username cannot be empty.")
+
+        add_username_to_excel(username)
+        return {
+            "success": True,
+            "response": {
+                "message": f"Username '{username}' has been added successfully."
+            }
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": {
+                "message": str(e)
+            }
+        }
+    
 # ------------------> System Health Check API <-------------------- #
 @app.get("/health", summary="Health Check", response_description="Returns health status of the service.")
 async def health_check():

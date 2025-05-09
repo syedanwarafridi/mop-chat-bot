@@ -6,6 +6,7 @@ import os
 import pandas as pd
 from urllib.parse import urlparse, unquote
 from datetime import datetime, timedelta, timezone
+from urllib.parse import quote
 import logging
 
 # Configure logging
@@ -171,6 +172,24 @@ def extract_usernames_from_excel():
                 usernames.append(username)
     
     return usernames
+
+# ----------------> Add Username to Excel <----------------
+def add_username_to_excel(username):
+    file_path = 'data/MIND.xlsx'
+    
+    df = pd.read_excel(file_path)
+    
+    if 'Profile URL' not in df.columns:
+        raise ValueError("The Excel file must contain a 'Profile URL' column.")
+    
+    encoded_username = quote(username)
+    new_profile_url = f"https://x.com/{encoded_username}/"
+    
+    new_row = pd.DataFrame({'Profile URL': [new_profile_url]})
+    updated_df = pd.concat([df, new_row], ignore_index=True)
+    updated_df.to_excel(file_path, index=False)
+    
+    print(f"Username '{username}' has been added to {file_path}")
 
 # ----------------> Filter based on Excel Sheet <----------------
 def filter_replies_by_usernames(replies, target_usernames):
