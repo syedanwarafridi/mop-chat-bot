@@ -15,6 +15,8 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from fastapi.middleware.cors import CORSMiddleware
+import pytz
+
 
 load_dotenv()
 print("Done")
@@ -23,7 +25,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # -----> Schedular <----- #
-scheduler = AsyncIOScheduler()
+us_eastern = pytz.timezone('US/Eastern')
+scheduler = AsyncIOScheduler(timezone=us_eastern)
 
 async def scheduled_post_tweet(app: FastAPI):
     request = Request({"type": "http", "app": app})
@@ -258,6 +261,7 @@ async def reply_to_recent_tweets(request: Request):
         tokenizer = request.app.state.tokenizer
 
         list_of_posts = get_latest_top3_posts()
+
         logger.info(f"get_latest_top3_posts returned: {list_of_posts}")
 
         if isinstance(list_of_posts, dict) and "error" in list_of_posts:
@@ -304,6 +308,7 @@ async def reply_to_recent_tweets(request: Request):
         list_of_replies = get_replies_to_tweets(posts)
         logger.info(f"Retrieved {len(list_of_replies)} replies")
         usernames = extract_usernames_from_excel()
+
         usernames_filtered_replies = filter_replies_by_usernames(list_of_replies, usernames)
 
         time_filtered_replies = filter_recent_replies(usernames_filtered_replies)

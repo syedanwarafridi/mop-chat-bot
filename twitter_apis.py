@@ -175,7 +175,7 @@ def extract_usernames_from_excel():
 
 # ----------------> Add Username to Excel <----------------
 def add_username_to_excel(username):
-    file_path = 'data/MIND.xlsx'
+    file_path = 'Notebooks/data/MIND.xlsx'
     
     df = pd.read_excel(file_path)
     
@@ -202,13 +202,14 @@ def filter_replies_by_usernames(replies, target_usernames):
                 'username': reply['username'],
                 'created_at': reply['created_at'],
                 'text': reply['text'],
-                'parent_post_text': reply['parent_post_text']
+                'parent_post_text': reply['parent_post_text'],
+                'conversation_id': reply.get('conversation_id', reply['tweet_id'])
             })
 
     return filtered_replies
 
 # -------------> Filtered Replies based on time <------------- #
-def filter_recent_replies(replies, hours=15):
+def filter_recent_replies(replies, hours=3):
     now = datetime.now(timezone.utc)
     cutoff = now - timedelta(hours=hours)
 
@@ -219,14 +220,41 @@ def filter_recent_replies(replies, hours=15):
 
     return recent_replies
 
-# ----------------> Filter unreplied tweets  <----------------
+# ----------------> Filter unreplied tweets  <------------------- #
 def filter_unreplied_tweets(tweets, my_username=user_name):
-    client = tweepy.Client(bearer_token=bearer_token, wait_on_rate_limit=True)
     unreplied = []
+    replied_conversations = set()
+    replied_users_per_post = {}  # {parent_post_text: set of usernames}
+
+    # Ensure my_username is a string (handle) and not an ID
+    if isinstance(my_username, int):
+        try:
+            user_response = client.get_user(id=my_username)
+            my_username = user_response.data.username
+        except Exception as e:
+            logger.error(f"Failed to get username for ID {my_username}: {e}")
+            return unreplied
 
     for tweet in tweets:
         tweet_id = tweet['tweet_id']
-        query = f'conversation_id:{tweet_id} -is:retweet'
+        conversation_id = tweet.get('conversation_id', tweet_id)
+        parent_post_text = tweet.get('parent_post_text', '')
+        replying_user = tweet.get('username')
+
+        if not replying_user:
+            continue
+
+        # Skip if already replied in this conversation
+        if conversation_id in replied_conversations:
+            continue
+
+        # Skip if we already replied to this user under this parent post
+        if parent_post_text not in replied_users_per_post:
+            replied_users_per_post[parent_post_text] = set()
+        if replying_user in replied_users_per_post[parent_post_text]:
+            continue
+
+        query = f'conversation_id:{conversation_id} -is:retweet'
 
         try:
             found_reply = False
@@ -242,17 +270,23 @@ def filter_unreplied_tweets(tweets, my_username=user_name):
                     users = {u['id']: u for u in response.includes['users']}
                     for reply in response.data:
                         author = users.get(reply.author_id)
-                        if author and author.username.lower() == my_username.lower():
+                        if author and str(author.username).lower() == str(my_username).lower():
                             found_reply = True
                             break
                 if found_reply:
                     break
 
-            if not found_reply:
-                unreplied.append(tweet)
+            if found_reply:
+                continue  # We already replied in this conversation
+
+            # Passed all filters — reply to this one
+            unreplied.append(tweet)
+            replied_conversations.add(conversation_id)
+            replied_users_per_post[parent_post_text].add(replying_user)
 
         except Exception as e:
-            return f"Error checking tweet {tweet_id}: {e}"
+            logger.error(f"Error checking tweet {tweet_id}: {e}")
+            continue
 
     return unreplied
 
@@ -284,35 +318,50 @@ def reply_to_tweet(tweet_id, reply_text):
         logger.error(f"Unexpected error in reply_to_tweet: {e}")
         return {"error": f"Unexpected error: {str(e)}"}
 
-# ----------------> Extract mentions  <----------------
+from datetime import datetime, timezone
+
+# ----------------> Extract mentions <----------------
 def extract_mentions():
     try:
         username = "Shift1646020"
+        my_username_lower = username.lower()
 
         user = client.get_user(username=username)
         if not user.data:
             return []
+
         user_id = user.data.id
 
         mentions = client.get_users_mentions(
             id=user_id,
-            max_results=100,
+            max_results=10,
             expansions=['author_id', 'referenced_tweets.id.author_id'],
-            tweet_fields=['created_at', 'referenced_tweets'],
+            tweet_fields=['created_at', 'referenced_tweets', 'conversation_id'],
             user_fields=['username']
         )
 
-        mention_details = []
         if not mentions.data:
-            return mention_details
+            return []
+
+        # Get today's date in UTC
+        today_utc = datetime.now(timezone.utc).date()
 
         author_ids = {user.id: user.username for user in mentions.includes.get('users', [])}
 
+        mention_details = []
+        replied_conversations = set()
+        replied_users_per_post = {}
+
         for tweet in mentions.data:
+            # 🔽 Filter only today's mentions
+            if tweet.created_at.date() != today_utc:
+                continue
 
             author_username = author_ids.get(tweet.author_id, 'Unknown')
             parent_author_id = None
             parent_post_text = None
+            conversation_id = tweet.conversation_id
+            tweet_id = tweet.id
 
             if tweet.referenced_tweets:
                 for ref_tweet in tweet.referenced_tweets:
@@ -331,22 +380,62 @@ def extract_mentions():
                 parent_author_id = tweet.author_id
                 parent_post_text = tweet.text
 
-            if parent_author_id and parent_author_id != user_id:
-                mention_details.append({
-                    'username': author_username,
-                    'tweet_id': tweet.id,
-                    'text': tweet.text,
-                    'created_at': tweet.created_at,
-                    'parent_post_text': parent_post_text
-                })
-            else:
-                print(f"Skipping mention: tweet_id={tweet.id}, parent_author_id={parent_author_id} is user or invalid")
+            if parent_author_id == user_id:
+                continue
+
+            if conversation_id in replied_conversations:
+                continue
+
+            if parent_post_text not in replied_users_per_post:
+                replied_users_per_post[parent_post_text] = set()
+            if author_username in replied_users_per_post[parent_post_text]:
+                continue
+
+            query = f'conversation_id:{conversation_id} -is:retweet'
+            try:
+                found_reply = False
+                for response in tweepy.Paginator(
+                    client.search_recent_tweets,
+                    query=query,
+                    tweet_fields=['author_id'],
+                    expansions='author_id',
+                    user_fields=['username'],
+                    max_results=10
+                ):
+                    if response.data:
+                        users = {u['id']: u for u in response.includes['users']}
+                        for reply in response.data:
+                            author = users.get(reply.author_id)
+                            if author and author.username.lower() == my_username_lower:
+                                found_reply = True
+                                break
+                    if found_reply:
+                        break
+                if found_reply:
+                    continue
+            except Exception as e:
+                logger.error(f"Error checking replies for tweet_id {tweet_id}: {e}")
+                continue
+
+            mention_details.append({
+                'username': author_username,
+                'tweet_id': tweet.id,
+                'text': tweet.text,
+                'created_at': tweet.created_at,
+                'parent_post_text': parent_post_text,
+                'conversation_id': conversation_id
+            })
+
+            replied_conversations.add(conversation_id)
+            replied_users_per_post[parent_post_text].add(author_username)
 
         return mention_details
 
     except tweepy.TweepyException as e:
+        logger.error(f"Tweepy exception: {e}")
         return []
     except Exception as e:
+        logger.error(f"Unhandled exception: {e}")
         return []
 
 #  -----------------> STATS <---------------- #

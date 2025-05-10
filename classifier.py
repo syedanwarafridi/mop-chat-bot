@@ -101,6 +101,7 @@ def twitter_post_writer():
                         - Do not include emoji in the post or any icon.
                         - Include URL in the post if you think it's necessary.
                         - Pick news randomly from the context and write a post based on that.
+                        - Do not say `check out on this site` simply provide url if the url is provided in news.
                     
                     Below are some examples of the post:
                         Post No 1: $240B stablecoin mcap incoming and u think we're early?\n @circle got that abu dhabi green light + @MetaMask letting u spend aUSDC anywhere... combine that with 2B fresh usdt minted on eth and 12% apy on coinbase \n regulatory cope incoming from places that missed the boat fr

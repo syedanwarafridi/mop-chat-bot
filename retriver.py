@@ -74,7 +74,7 @@ def update_api():
     except requests.exceptions.RequestException as e:
         return {"error": "Request exception occurred", "details": str(e)}
 
-# -----------------------> Tavily API <----------------------- #
+# -----------------------> Tavily API for replies <----------------------- #
 from langchain_community.tools.tavily_search import TavilySearchResults
 
 tavily_api_key = os.getenv('TAVILY_API_KEY')
@@ -82,19 +82,22 @@ tavily_api_key = os.getenv('TAVILY_API_KEY')
 os.environ['TAVILY_API_KEY'] = tavily_api_key
 def tavily_data(query: str):
     tool = TavilySearchResults(max_results=5,include_domains=["https://crypto.news/", "https://cointelegraph.com/", "https://dexscreener.com/"], include_images=False, include_videos=False, include_links=True)
-    # tools = [tool]
     results = tool.invoke(query)
     # filtered_results = [{"title": item["title"], "content": item["content"]} for item in results]
     return results
 
-# -----------------------> Tavily for POSTs <----------------------- #
-from langchain_community.tools.tavily_search import TavilySearchResults
+# -----------------------> Tavily google search <----------------------- #
+def google_search(query: str):
+    tool = TavilySearchResults(max_results=3, include_images=False, include_videos=False, include_links=True)
+    results = tool.invoke(query)
+    return results
 
+# -----------------------> Tavily for POSTs <----------------------- #
 tavily_api_key = os.getenv('TAVILY_API_KEY')
 
 os.environ['TAVILY_API_KEY'] = tavily_api_key
 def tavily_for_post(query: str):
-    tool = TavilySearchResults(max_results=10, include_domains=["https://www.reuters.com/markets/cryptocurrency/", "https://www.forbes.com/digital-assets/news/?sh=487b1daf9d5b", "https://finance.yahoo.com/topic/crypto/", "https://crypto.news/", "https://finance.yahoo.com/markets/"], include_images=False, include_videos=False, include_links=True)
+    tool = TavilySearchResults(max_results=1, include_domains=["https://www.reuters.com/markets/cryptocurrency/", "https://www.forbes.com/digital-assets/news/?sh=487b1daf9d5b", "https://finance.yahoo.com/topic/crypto/", "https://crypto.news/", "https://finance.yahoo.com/markets/"], include_images=False, include_videos=False, include_links=True)
     # tools = [tool]
     results = tool.invoke(query)
     # filtered_results = [{"title": item["title"], "content": item["content"]} for item in results]
