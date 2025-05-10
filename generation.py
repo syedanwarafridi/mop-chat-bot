@@ -2,9 +2,9 @@ from fastapi import FastAPI, Request, HTTPException
 from contextlib import asynccontextmanager
 import os
 from dotenv import load_dotenv
-from inference import load_fine_tuned_model, x_inference, terminal_inference
+from inference import load_fine_tuned_model, x_inference, terminal_inference, grok_inference
 from classifier import classifier_model, twitter_post_writer
-from retriver import get_combined_stats_with_api
+from retriver import get_combined_stats_with_api, clean_tweet_text
 from twitter_apis import post_tweets, get_latest_top3_posts, get_replies_to_tweets, extract_usernames_from_excel, filter_replies_by_usernames, filter_recent_replies, filter_unreplied_tweets, reply_to_tweet, extract_mentions, add_username_to_excel
 from fastapi.responses import JSONResponse
 import traceback
@@ -16,6 +16,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from fastapi.middleware.cors import CORSMiddleware
 import pytz
+import re
 
 
 load_dotenv()
@@ -54,23 +55,23 @@ async def lifespan(app: FastAPI):
     )
 
     # Post Tweet – 3 times a day
-    scheduler.add_job(scheduled_post_tweet, CronTrigger(hour=0, minute=0), args=[app])
+    scheduler.add_job(scheduled_post_tweet, CronTrigger(hour=1, minute=0), args=[app])
     scheduler.add_job(scheduled_post_tweet, CronTrigger(hour=8, minute=10), args=[app])
-    scheduler.add_job(scheduled_post_tweet, CronTrigger(hour=16, minute=20), args=[app])
+    scheduler.add_job(scheduled_post_tweet, CronTrigger(hour=21, minute=20), args=[app])
 
     # Reply to Recent – 7 times a day
-    scheduler.add_job(scheduled_reply_to_recent, CronTrigger(hour=1, minute=0), args=[app])
-    scheduler.add_job(scheduled_reply_to_recent, CronTrigger(hour=4, minute=20), args=[app])
-    scheduler.add_job(scheduled_reply_to_recent, CronTrigger(hour=7, minute=40), args=[app])
+    scheduler.add_job(scheduled_reply_to_recent, CronTrigger(hour=2, minute=0), args=[app])
+    scheduler.add_job(scheduled_reply_to_recent, CronTrigger(hour=5, minute=0), args=[app])
+    scheduler.add_job(scheduled_reply_to_recent, CronTrigger(hour=9, minute=0), args=[app])
     scheduler.add_job(scheduled_reply_to_recent, CronTrigger(hour=11, minute=0), args=[app])
-    scheduler.add_job(scheduled_reply_to_recent, CronTrigger(hour=14, minute=20), args=[app])
-    scheduler.add_job(scheduled_reply_to_recent, CronTrigger(hour=17, minute=40), args=[app])
-    scheduler.add_job(scheduled_reply_to_recent, CronTrigger(hour=21, minute=0), args=[app])
+    scheduler.add_job(scheduled_reply_to_recent, CronTrigger(hour=22, minute=0), args=[app])
+    scheduler.add_job(scheduled_reply_to_recent, CronTrigger(hour=23, minute=0), args=[app])
+    #scheduler.add_job(scheduled_reply_to_recent, CronTrigger(hour=21, minute=0), args=[app])
 
-    # Reply to Mention – 3 times a day
-    scheduler.add_job(scheduled_reply_to_mention, CronTrigger(hour=2, minute=30), args=[app])
-    scheduler.add_job(scheduled_reply_to_mention, CronTrigger(hour=10, minute=30), args=[app])
-    scheduler.add_job(scheduled_reply_to_mention, CronTrigger(hour=18, minute=30), args=[app])
+    # # Reply to Mention – 3 times a day
+    # scheduler.add_job(scheduled_reply_to_mention, CronTrigger(hour=2, minute=30), args=[app])
+    # scheduler.add_job(scheduled_reply_to_mention, CronTrigger(hour=10, minute=30), args=[app])
+    # scheduler.add_job(scheduled_reply_to_mention, CronTrigger(hour=18, minute=30), args=[app])
 
     scheduler.start()
 
@@ -200,15 +201,17 @@ async def get_classifier_response(query: str):
         )
 
 # -------> Twitter Post API <----- #
+# -------> Twitter Post API <----- #
 @app.post("/post-tweet", summary="Post a Tweet", response_description="The tweet content and status.")
 async def post_tweet(request: Request):
     try:
-       
-        tweet_content = twitter_post_writer()
-        print("Tweet Content: ", tweet_content)
 
-        response = post_tweets(tweet_content)
-        
+        tweet_content = twitter_post_writer()
+        text = clean_tweet_text(tweet_content)
+        print("Tweet Content: ", text)
+
+        response = post_tweets(text)
+
         if isinstance(response, str):
             return JSONResponse(
                 status_code=400,
@@ -219,7 +222,7 @@ async def post_tweet(request: Request):
                     }
                 }
             )
-        
+
         if response.get("error"):
             return JSONResponse(
                 status_code=400,
@@ -230,7 +233,7 @@ async def post_tweet(request: Request):
                     }
                 }
             )
-        
+
         return {
             "success": True,
             "response": {
@@ -257,8 +260,8 @@ async def post_tweet(request: Request):
 @app.post("/reply-to-recent", summary="Reply to Recent Tweets", response_description="Replies posted successfully.")
 async def reply_to_recent_tweets(request: Request):
     try:
-        model = request.app.state.model
-        tokenizer = request.app.state.tokenizer
+        # model = request.app.state.model
+        # tokenizer = request.app.state.tokenizer
 
         list_of_posts = get_latest_top3_posts()
 
@@ -319,7 +322,7 @@ async def reply_to_recent_tweets(request: Request):
             query = tweet['text']
             tweet_id = tweet['tweet_id']
             parent_post = tweet['parent_post_text']
-            response, classification, context = x_inference(model, tokenizer, query, parent_post)
+            response, classification, context = grok_inference(query, parent_post)
 
             reply_result = reply_to_tweet(tweet_id, response)
 

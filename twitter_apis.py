@@ -209,16 +209,19 @@ def filter_replies_by_usernames(replies, target_usernames):
     return filtered_replies
 
 # -------------> Filtered Replies based on time <------------- #
-def filter_recent_replies(replies, hours=3):
+def filter_recent_replies(replies, hours=3, max_replies=15):
     now = datetime.now(timezone.utc)
     cutoff = now - timedelta(hours=hours)
 
+    # Filter and sort replies (newest first)
     recent_replies = sorted(
         [reply for reply in replies if reply['created_at'] >= cutoff],
-        key=lambda r: r['created_at']
+        key=lambda r: r['created_at'],
+        reverse=True
     )
 
-    return recent_replies
+    # Return only the latest X replies
+    return recent_replies[:max_replies]
 
 # ----------------> Filter unreplied tweets  <------------------- #
 def filter_unreplied_tweets(tweets, my_username=user_name):
@@ -248,7 +251,6 @@ def filter_unreplied_tweets(tweets, my_username=user_name):
         if conversation_id in replied_conversations:
             continue
 
-        # Skip if we already replied to this user under this parent post
         if parent_post_text not in replied_users_per_post:
             replied_users_per_post[parent_post_text] = set()
         if replying_user in replied_users_per_post[parent_post_text]:
@@ -277,8 +279,7 @@ def filter_unreplied_tweets(tweets, my_username=user_name):
                     break
 
             if found_reply:
-                continue  # We already replied in this conversation
-
+                continue 
             # Passed all filters — reply to this one
             unreplied.append(tweet)
             replied_conversations.add(conversation_id)

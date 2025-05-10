@@ -2,6 +2,7 @@ import requests
 import os
 from twitter_apis import get_my_tweets_and_replies
 import psycopg2
+import re
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -161,3 +162,41 @@ def get_combined_stats_with_api():
 
     combined_data = {**twitter_data, **db_data, **api_data}
     return combined_data
+
+# --------------> Cleaner <------------------
+def clean_tweet_text(text: str) -> str:
+    # Remove markdown links, plain URLs, and bracketed URLs with optional leading/trailing phrases
+    text = re.sub(
+        r'''
+        (?:\b(?:check\s+out|read\s+more|more\s+at|visit|see|explore)\b\s*)?  # optional leading
+        (\[.*?\]\(.*?\)|                # [text](url)
+         \[.*?(https?://|www\.)\S*?\]|  # [Source: http://...]
+         https?://\S+|                  # http(s) URLs
+         www\.\S+)                      # www URLs
+        (\s*(?:for\s+more\s+details|or|and)?\.?)?  # optional trailing
+        ''',
+        '',
+        text,
+        flags=re.IGNORECASE | re.VERBOSE
+    )
+
+    # Remove common filler phrases
+    text = re.sub(
+        r'\b(?:stay\s+tuned\s+for\s+more\s+updates!?|'
+        r'more\s+details\s+coming\s+soon!?|'
+        r'keep\s+an\s+eye\s+out\s+for\s+updates!?|'
+        r'updates\s+to\s+follow!?|'
+        r'more\s+to\s+come!?|'
+        r'we\'ll\s+be\s+back\s+with\s+more!?|'
+        r'find\s+out\s+more\s+soon!?|'
+        r'learn\s+more\s+soon!?)\b',
+        '',
+        text,
+        flags=re.IGNORECASE
+    )
+
+    # Normalize spacing and punctuation
+    text = re.sub(r'\s{2,}', ' ', text).strip()
+    text = re.sub(r'\s+([.,!?])', r'\1', text)
+
+    return text
