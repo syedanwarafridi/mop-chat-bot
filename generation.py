@@ -16,7 +16,6 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from fastapi.middleware.cors import CORSMiddleware
 import pytz
-import re
 
 
 load_dotenv()
@@ -37,9 +36,9 @@ async def scheduled_reply_to_recent(app: FastAPI):
     request = Request({"type": "http", "app": app})
     await reply_to_recent_tweets(request)
 
-async def scheduled_reply_to_mention(app: FastAPI):
-    request = Request({"type": "http", "app": app})
-    await reply_to_mention_tweets(request)
+#async def scheduled_reply_to_mention(app: FastAPI):
+#    request = Request({"type": "http", "app": app})
+#    await reply_to_mention_tweets(request)
 
 # -----> Fastapi Setup <----- #
 @asynccontextmanager
@@ -55,23 +54,23 @@ async def lifespan(app: FastAPI):
     )
 
     # Post Tweet – 3 times a day
-    scheduler.add_job(scheduled_post_tweet, CronTrigger(hour=1, minute=0), args=[app])
+    scheduler.add_job(scheduled_post_tweet, CronTrigger(hour=13, minute=0), args=[app])
     scheduler.add_job(scheduled_post_tweet, CronTrigger(hour=8, minute=10), args=[app])
     scheduler.add_job(scheduled_post_tweet, CronTrigger(hour=21, minute=20), args=[app])
 
     # Reply to Recent – 7 times a day
-    scheduler.add_job(scheduled_reply_to_recent, CronTrigger(hour=2, minute=0), args=[app])
-    scheduler.add_job(scheduled_reply_to_recent, CronTrigger(hour=5, minute=0), args=[app])
+    scheduler.add_job(scheduled_reply_to_recent, CronTrigger(hour=14, minute=0), args=[app])
+    scheduler.add_job(scheduled_reply_to_recent, CronTrigger(hour=17, minute=0), args=[app])
     scheduler.add_job(scheduled_reply_to_recent, CronTrigger(hour=9, minute=0), args=[app])
     scheduler.add_job(scheduled_reply_to_recent, CronTrigger(hour=11, minute=0), args=[app])
     scheduler.add_job(scheduled_reply_to_recent, CronTrigger(hour=22, minute=0), args=[app])
     scheduler.add_job(scheduled_reply_to_recent, CronTrigger(hour=23, minute=0), args=[app])
     #scheduler.add_job(scheduled_reply_to_recent, CronTrigger(hour=21, minute=0), args=[app])
 
-    # # Reply to Mention – 3 times a day
-    # scheduler.add_job(scheduled_reply_to_mention, CronTrigger(hour=2, minute=30), args=[app])
-    # scheduler.add_job(scheduled_reply_to_mention, CronTrigger(hour=10, minute=30), args=[app])
-    # scheduler.add_job(scheduled_reply_to_mention, CronTrigger(hour=18, minute=30), args=[app])
+    # Reply to Mention – 3 times a day
+    #scheduler.add_job(scheduled_reply_to_mention, CronTrigger(hour=2, minute=30), args=[app])
+    #scheduler.add_job(scheduled_reply_to_mention, CronTrigger(hour=10, minute=30), args=[app])
+    #scheduler.add_job(scheduled_reply_to_mention, CronTrigger(hour=18, minute=30), args=[app])
 
     scheduler.start()
 
@@ -124,11 +123,11 @@ async def oauth_callback(request: Request, oauth_token: str, oauth_verifier: str
         auth = request.app.state.auth
         auth.request_token = {"oauth_token": oauth_token}
         access_token, access_token_secret = auth.get_access_token(oauth_verifier)
-        
+
         # Save tokens to .env (optional, for convenience)
         with open(".env", "a") as f:
             f.write(f"\nACCESS_TOKEN={access_token}\nACCESS_TOKEN_SECRET={access_token_secret}\n")
-        
+
         return {
             "success": True,
             "response": {
@@ -201,7 +200,6 @@ async def get_classifier_response(query: str):
         )
 
 # -------> Twitter Post API <----- #
-# -------> Twitter Post API <----- #
 @app.post("/post-tweet", summary="Post a Tweet", response_description="The tweet content and status.")
 async def post_tweet(request: Request):
     try:
@@ -255,13 +253,13 @@ async def post_tweet(request: Request):
                 }
             }
         )
-    
+
 #----------> My Posts Tweet-Replies API <-------- #
 @app.post("/reply-to-recent", summary="Reply to Recent Tweets", response_description="Replies posted successfully.")
 async def reply_to_recent_tweets(request: Request):
     try:
-        # model = request.app.state.model
-        # tokenizer = request.app.state.tokenizer
+        model = request.app.state.model
+        tokenizer = request.app.state.tokenizer
 
         list_of_posts = get_latest_top3_posts()
 
@@ -446,7 +444,7 @@ async def reply_to_mention_tweets(request: Request):
                 }
             }
         )
-    
+
 # --------------------> Stats API < ---------------------------
 @app.get("/stats", summary="System Statistics", response_description="Aggregated stats from Twitter, RAG DB, and API.")
 async def stats():
@@ -494,7 +492,7 @@ async def add_username(request: Request, payload: UsernameRequest):
                 "message": str(e)
             }
         }
-    
+
 # ------------------> System Health Check API <-------------------- #
 @app.get("/health", summary="Health Check", response_description="Returns health status of the service.")
 async def health_check():

@@ -324,7 +324,7 @@ from datetime import datetime, timezone
 # ----------------> Extract mentions <----------------
 def extract_mentions():
     try:
-        username = "Shift1646020"
+        username = "MIND_agent"
         my_username_lower = username.lower()
 
         user = client.get_user(username=username)

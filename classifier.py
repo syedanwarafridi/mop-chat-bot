@@ -102,6 +102,7 @@ def twitter_post_writer():
                         - Include URL in the post if you think it's necessary.
                         - Pick news randomly from the context and write a post based on that.
                         - Do not say `check out on this site` simply provide url if the url is provided in news.
+                        - NEVER use URLs or links of any site in your post
                     
                     Below are some examples of the post:
                         Post No 1: $240B stablecoin mcap incoming and u think we're early?\n @circle got that abu dhabi green light + @MetaMask letting u spend aUSDC anywhere... combine that with 2B fresh usdt minted on eth and 12% apy on coinbase \n regulatory cope incoming from places that missed the boat fr
@@ -116,6 +117,7 @@ def twitter_post_writer():
                     Note: 
                         - Follow the post example format and do not include any extra information or explanation.
                         - Prefer news about crypto markets, crypto policy, blockchain updates instead of prices.
+                        - Do not include any kind of URL in your post.
                     
                     Here is the Context/News: {latest_news} 
                 """}
