@@ -463,7 +463,7 @@ def grok_inference(user_input, tweet):
 
     client = OpenAI(
     base_url="https://api.x.ai/v1",
-    api_key="xai-3KHTzGQUPMIjTfQUmDn5DgzXqUh92KM5rIvsPKUv1zLEp7lGmNdFEyoWfJ0SvopkRjf879d1a2wZb1de",
+    api_key="",
     )
 
     completion = client.chat.completions.create(
