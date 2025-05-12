@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 import os
 from dotenv import load_dotenv
 from inference import load_fine_tuned_model, x_inference, terminal_inference, grok_inference
-from classifier import classifier_model, twitter_post_writer
+from classifier import classifier_model, grok_post_writer
 from retriver import get_combined_stats_with_api, clean_tweet_text
 from twitter_apis import post_tweets, get_latest_top3_posts, get_replies_to_tweets, extract_usernames_from_excel, filter_replies_by_usernames, filter_recent_replies, filter_unreplied_tweets, reply_to_tweet, extract_mentions, add_username_to_excel
 from fastapi.responses import JSONResponse
@@ -16,6 +16,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from fastapi.middleware.cors import CORSMiddleware
 import pytz
+import datetime
 
 
 load_dotenv()
@@ -55,8 +56,8 @@ async def lifespan(app: FastAPI):
 
     # Post Tweet – 3 times a day
     scheduler.add_job(scheduled_post_tweet, CronTrigger(hour=13, minute=0), args=[app])
-    scheduler.add_job(scheduled_post_tweet, CronTrigger(hour=8, minute=10), args=[app])
-    scheduler.add_job(scheduled_post_tweet, CronTrigger(hour=21, minute=20), args=[app])
+    scheduler.add_job(scheduled_post_tweet, CronTrigger(hour=8, minute=0), args=[app])
+    scheduler.add_job(scheduled_post_tweet, CronTrigger(hour=21, minute=0), args=[app])
 
     # Reply to Recent – 7 times a day
     scheduler.add_job(scheduled_reply_to_recent, CronTrigger(hour=14, minute=0), args=[app])
@@ -203,34 +204,23 @@ async def get_classifier_response(query: str):
 @app.post("/post-tweet", summary="Post a Tweet", response_description="The tweet content and status.")
 async def post_tweet(request: Request):
     try:
+        current_hour = pytz.timezone('US/Eastern').localize(datetime.datetime.now()).hour
+        if current_hour in [8, 13, 21]:
+            source_set = {8: 1, 13: 2, 21: 3}.get(current_hour, 1)
+        else:
+            source_set = 3
 
-        tweet_content = twitter_post_writer()
-        text = clean_tweet_text(tweet_content)
-        print("Tweet Content: ", text)
-
-        response = post_tweets(text)
+        tweet_content = grok_post_writer(source_set=source_set)
+        # text = clean_tweet_text(tweet_content)
+        # print("Tweet Content: ", text)
+        
+        response = post_tweets(tweet_content.lower())
+        print(response)
 
         if isinstance(response, str):
-            return JSONResponse(
-                status_code=400,
-                content={
-                    "success": False,
-                    "error": {
-                        "message": response
-                    }
-                }
-            )
-
+            return JSONResponse(status_code=400, content={"success": False, "error": {"message": response}})
         if response.get("error"):
-            return JSONResponse(
-                status_code=400,
-                content={
-                    "success": False,
-                    "error": {
-                        "message": response["error"]
-                    }
-                }
-            )
+            return JSONResponse(status_code=400, content={"success": False, "error": {"message": response["error"]}})
 
         return {
             "success": True,
@@ -242,17 +232,9 @@ async def post_tweet(request: Request):
         }
 
     except Exception as e:
-        error_message = str(e)
         traceback.print_exc()
-        return JSONResponse(
-            status_code=500,
-            content={
-                "success": False,
-                "error": {
-                    "message": error_message
-                }
-            }
-        )
+        return JSONResponse(status_code=500, content={"success": False, "error": {"message": str(e)}})
+
 
 #----------> My Posts Tweet-Replies API <-------- #
 @app.post("/reply-to-recent", summary="Reply to Recent Tweets", response_description="Replies posted successfully.")

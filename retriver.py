@@ -97,12 +97,31 @@ def google_search(query: str):
 tavily_api_key = os.getenv('TAVILY_API_KEY')
 
 os.environ['TAVILY_API_KEY'] = tavily_api_key
-def tavily_for_post(query: str):
-    tool = TavilySearchResults(max_results=1, include_domains=["https://www.reuters.com/markets/cryptocurrency/", "https://www.forbes.com/digital-assets/news/?sh=487b1daf9d5b", "https://finance.yahoo.com/topic/crypto/", "https://crypto.news/", "https://finance.yahoo.com/markets/"], include_images=False, include_videos=False, include_links=True)
-    # tools = [tool]
+def tavily_for_post(query: str, source_set: int = 1):
+    if source_set == 1:
+        sources = [
+            "https://watcher.guru/news/"
+        ]
+    elif source_set == 2:
+        sources = [
+            "https://u.today/latest-cryptocurrency-news"
+        ]
+    else:  # source_set == 3
+        sources = [
+            "https://www.coindesk.com/latest-crypto-news",
+            "https://www.theblock.co/latest-crypto-news"
+        ]
+
+    tool = TavilySearchResults(
+        max_results=2,
+        include_domains=sources,
+        include_images=False,
+        include_videos=False,
+        include_links=True
+    )
     results = tool.invoke(query)
-    # filtered_results = [{"title": item["title"], "content": item["content"]} for item in results]
-    return results
+    return [{"title": item["title"], "content": item["content"]} for item in results]
+
 
 # -----------------------> RAG DB STATS <----------------------- #
 def get_rag_db_stats():

@@ -209,7 +209,7 @@ def filter_replies_by_usernames(replies, target_usernames):
     return filtered_replies
 
 # -------------> Filtered Replies based on time <------------- #
-def filter_recent_replies(replies, hours=3, max_replies=15):
+def filter_recent_replies(replies, hours=3, max_replies=1):
     now = datetime.now(timezone.utc)
     cutoff = now - timedelta(hours=hours)
 
